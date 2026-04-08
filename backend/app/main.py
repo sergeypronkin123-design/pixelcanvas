@@ -33,7 +33,19 @@ async def reservation_cleanup_task():
 async def lifespan(app: FastAPI):
     # Startup
     logger.info("Starting PixelCanvas API...")
-    Base.metadata.create_all(bind=engine)
+    from sqlalchemy import inspect, text
+    inspector = inspect(engine)
+    existing_tables = inspector.get_table_names()
+    if not existing_tables:
+        Base.metadata.create_all(bind=engine)
+        logger.info("Created all tables")
+    else:
+        # Tables already exist, create only missing ones
+        for table in Base.metadata.sorted_tables:
+            if table.name not in existing_tables:
+                table.create(bind=engine)
+                logger.info(f"Created missing table: {table.name}")
+        logger.info("Tables already exist, skipped creation")
 
     # Initialize canvas blocks
     db = SessionLocal()
