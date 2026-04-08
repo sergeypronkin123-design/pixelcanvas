@@ -16,6 +16,11 @@ class Settings(BaseSettings):
     STRIPE_PUBLISHABLE_KEY: str = ""
     STRIPE_WEBHOOK_SECRET: str = ""
 
+    # YooKassa
+    YUKASSA_SHOP_ID: str = ""
+    YUKASSA_SECRET_KEY: str = ""
+    YUKASSA_WEBHOOK_SECRET: str = ""
+
     # Redis
     REDIS_URL: str = "redis://localhost:6379/0"
 
@@ -28,7 +33,7 @@ class Settings(BaseSettings):
     CANVAS_WIDTH: int = 1000
     CANVAS_HEIGHT: int = 1000
     BLOCK_SIZE: int = 10
-    BASE_BLOCK_PRICE: int = 100  # in cents
+    BASE_BLOCK_PRICE: int = 100  # in cents/kopecks
     CURRENCY: str = "usd"
     RESALE_FEE_PERCENT: float = 5.0
     RESERVATION_TIMEOUT_SECONDS: int = 600

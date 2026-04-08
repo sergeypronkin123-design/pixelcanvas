@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Query
 from sqlalchemy.orm import Session
 import stripe
 import json
@@ -9,6 +9,7 @@ from app.core.config import get_settings
 from app.models import User, Order, OrderStatus, WebhookEvent
 from app.schemas import PurchaseRequest, PurchaseResaleRequest, CheckoutResponse, OrderOut
 from app.services.payment import create_primary_checkout, create_resale_checkout, handle_checkout_completed
+from app.services.yukassa import create_yukassa_primary_checkout, create_yukassa_resale_checkout, handle_yukassa_webhook
 from typing import List
 
 logger = logging.getLogger(__name__)
@@ -17,27 +18,43 @@ router = APIRouter(prefix="/purchase", tags=["purchase"])
 
 
 @router.post("/checkout", response_model=CheckoutResponse)
-def initiate_checkout(data: PurchaseRequest, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def initiate_checkout(
+    data: PurchaseRequest,
+    provider: str = Query("stripe", enum=["stripe", "yukassa"]),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     try:
-        result = create_primary_checkout(db, user.id, data.block_id)
+        if provider == "yukassa":
+            result = create_yukassa_primary_checkout(db, user.id, data.block_id)
+        else:
+            result = create_primary_checkout(db, user.id, data.block_id)
         return CheckoutResponse(**result)
     except ValueError as e:
         raise HTTPException(400, str(e))
     except Exception as e:
         logger.error(f"Checkout error: {e}")
-        raise HTTPException(500, "Failed to create checkout session")
+        raise HTTPException(500, f"Failed to create checkout session: {str(e)}")
 
 
 @router.post("/checkout/resale", response_model=CheckoutResponse)
-def initiate_resale_checkout(data: PurchaseResaleRequest, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def initiate_resale_checkout(
+    data: PurchaseResaleRequest,
+    provider: str = Query("stripe", enum=["stripe", "yukassa"]),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     try:
-        result = create_resale_checkout(db, user.id, data.listing_id)
+        if provider == "yukassa":
+            result = create_yukassa_resale_checkout(db, user.id, data.listing_id)
+        else:
+            result = create_resale_checkout(db, user.id, data.listing_id)
         return CheckoutResponse(**result)
     except ValueError as e:
         raise HTTPException(400, str(e))
     except Exception as e:
         logger.error(f"Resale checkout error: {e}")
-        raise HTTPException(500, "Failed to create checkout session")
+        raise HTTPException(500, f"Failed to create checkout session: {str(e)}")
 
 
 @router.post("/webhook")
@@ -55,7 +72,6 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
         logger.error(f"Webhook signature error: {e}")
         raise HTTPException(400, "Invalid signature")
 
-    # Idempotency check
     event_id = event.get("id") if isinstance(event, dict) else getattr(event, "id", None)
     event_type = event.get("type") if isinstance(event, dict) else getattr(event, "type", None)
     event_data = event.get("data") if isinstance(event, dict) else getattr(event, "data", None)
@@ -96,6 +112,48 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
                 ).first()
                 if order:
                     order.status = OrderStatus.EXPIRED
+
+    webhook_event.processed = True
+    db.commit()
+    return {"status": "ok"}
+
+
+@router.post("/webhook/yukassa")
+async def yukassa_webhook(request: Request, db: Session = Depends(get_db)):
+    """YooKassa webhook endpoint."""
+    payload = await request.body()
+    
+    try:
+        data = json.loads(payload)
+    except json.JSONDecodeError:
+        raise HTTPException(400, "Invalid JSON")
+
+    event_type = data.get("event")
+    payment_data = data
+
+    # Extract unique ID for idempotency
+    payment_obj = data.get("object", {})
+    payment_id = payment_obj.get("id", "")
+    event_id = f"yk_{payment_id}_{event_type}"
+
+    existing = db.query(WebhookEvent).filter(WebhookEvent.external_id == event_id).first()
+    if existing and existing.processed:
+        return {"status": "already_processed"}
+
+    webhook_event = WebhookEvent(
+        provider="yukassa",
+        event_type=event_type or "unknown",
+        external_id=event_id,
+        payload_json=json.dumps(data, default=str),
+        processed=False,
+    )
+    db.add(webhook_event)
+    db.flush()
+
+    if event_type == "payment.succeeded":
+        handle_yukassa_webhook(db, payment_data)
+    elif event_type in ("payment.canceled",):
+        handle_yukassa_webhook(db, payment_data)
 
     webhook_event.processed = True
     db.commit()
