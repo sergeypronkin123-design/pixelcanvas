@@ -183,14 +183,13 @@ export function LandingPage() {
             </div>
             <div className="flex flex-wrap gap-6 text-xs text-canvas-muted">
               <Link to="/offer" className="hover:text-canvas-bright transition-colors">Публичная оферта</Link>
-              <Link to="/contacts" className="hover:text-canvas-bright transition-colors">Контакты и реквизиты</Link>
               <Link to="/refund" className="hover:text-canvas-bright transition-colors">Возврат</Link>
               <Link to="/privacy" className="hover:text-canvas-bright transition-colors">Конфиденциальность</Link>
             </div>
           </div>
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-6 border-t border-canvas-border/50">
             <div className="text-xs text-canvas-muted">
-              &copy; {new Date().getFullYear()} PixelCanvas. Самозанятый Пронкин Сергей. ИНН: 250202459700
+              &copy; {new Date().getFullYear()} PixelCanvas. All rights reserved.
             </div>
             <div className="text-xs text-canvas-muted">
               support@pixelcanvas.ru
