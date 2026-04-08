@@ -1,0 +1,76 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #2a2a3d #0a0a0f;
+  }
+  *::-webkit-scrollbar { width: 6px; height: 6px; }
+  *::-webkit-scrollbar-track { background: #0a0a0f; }
+  *::-webkit-scrollbar-thumb { background: #2a2a3d; border-radius: 3px; }
+  *::-webkit-scrollbar-thumb:hover { background: #3a3a5d; }
+
+  ::selection {
+    background: rgba(0, 240, 255, 0.2);
+    color: #fff;
+  }
+
+  body {
+    overflow-x: hidden;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply px-6 py-3 bg-neon-cyan/10 border border-neon-cyan/40 text-neon-cyan rounded-lg
+           font-display font-semibold tracking-wide
+           hover:bg-neon-cyan/20 hover:border-neon-cyan/70 hover:shadow-[0_0_20px_rgba(0,240,255,0.15)]
+           active:scale-[0.98] transition-all duration-200 cursor-pointer
+           disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-neon-cyan/10;
+  }
+
+  .btn-secondary {
+    @apply px-5 py-2.5 bg-canvas-elevated border border-canvas-border text-canvas-text rounded-lg
+           font-display font-medium
+           hover:bg-canvas-border/50 hover:border-canvas-muted/50
+           active:scale-[0.98] transition-all duration-200 cursor-pointer;
+  }
+
+  .btn-danger {
+    @apply px-5 py-2.5 bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg
+           font-display font-medium
+           hover:bg-red-500/20 hover:border-red-500/50
+           active:scale-[0.98] transition-all duration-200 cursor-pointer;
+  }
+
+  .card {
+    @apply bg-canvas-surface border border-canvas-border rounded-xl p-6
+           backdrop-blur-sm;
+  }
+
+  .card-hover {
+    @apply card hover:border-neon-cyan/30 hover:shadow-[0_0_30px_rgba(0,240,255,0.05)]
+           transition-all duration-300;
+  }
+
+  .input-field {
+    @apply w-full px-4 py-3 bg-canvas-bg border border-canvas-border rounded-lg
+           text-canvas-text placeholder-canvas-muted font-body
+           focus:outline-none focus:border-neon-cyan/50 focus:ring-1 focus:ring-neon-cyan/20
+           transition-all duration-200;
+  }
+
+  .label-text {
+    @apply block text-sm font-medium text-canvas-muted mb-1.5 font-display;
+  }
+
+  .glow-text {
+    text-shadow: 0 0 20px currentColor, 0 0 40px currentColor;
+  }
+
+  .glass {
+    @apply bg-canvas-surface/80 backdrop-blur-xl border border-canvas-border/50;
+  }
+}
