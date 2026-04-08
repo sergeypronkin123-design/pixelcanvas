@@ -26,26 +26,15 @@ async def reservation_cleanup_task():
             db.close()
         except Exception as e:
             logger.error(f"Cleanup task error: {e}")
-        await asyncio.sleep(60)  # Run every minute
+        await asyncio.sleep(60)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
     logger.info("Starting PixelCanvas API...")
-    from sqlalchemy import inspect, text
-    inspector = inspect(engine)
-    existing_tables = inspector.get_table_names()
-    if not existing_tables:
-        Base.metadata.create_all(bind=engine)
-        logger.info("Created all tables")
-    else:
-        # Tables already exist, create only missing ones
-        for table in Base.metadata.sorted_tables:
-            if table.name not in existing_tables:
-                table.create(bind=engine)
-                logger.info(f"Created missing table: {table.name}")
-        logger.info("Tables already exist, skipped creation")
+    Base.metadata.create_all(bind=engine, checkfirst=True)
+    logger.info("Database tables ready")
 
     # Initialize canvas blocks
     db = SessionLocal()

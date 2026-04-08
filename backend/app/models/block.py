@@ -20,7 +20,7 @@ class Block(Base):
     width = Column(Integer, nullable=False, default=10)
     height = Column(Integer, nullable=False, default=10)
     owner_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
-    status = Column(SAEnum(BlockStatus), default=BlockStatus.FREE, nullable=False, index=True)
+    status = Column(SAEnum(BlockStatus), default=BlockStatus.FREE, nullable=False)
     base_price = Column(Integer, nullable=False, default=100)
     current_price = Column(Integer, nullable=False, default=100)
     reserved_by = Column(Integer, ForeignKey("users.id"), nullable=True)
@@ -30,7 +30,6 @@ class Block(Base):
 
     __table_args__ = (
         Index("ix_blocks_xy", "x", "y", unique=True),
-        Index("ix_blocks_status", "status"),
     )
 
     owner = relationship("User", back_populates="blocks", foreign_keys=[owner_id])
