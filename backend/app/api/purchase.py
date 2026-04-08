@@ -51,45 +51,54 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
         )
     except ValueError:
         raise HTTPException(400, "Invalid payload")
-    except stripe.error.SignatureVerificationError:
+    except Exception as e:
+        logger.error(f"Webhook signature error: {e}")
         raise HTTPException(400, "Invalid signature")
 
-    # Idempotency: check if we've already processed this event
-    existing = db.query(WebhookEvent).filter(WebhookEvent.external_id == event["id"]).first()
+    # Idempotency check
+    event_id = event.get("id") if isinstance(event, dict) else getattr(event, "id", None)
+    event_type = event.get("type") if isinstance(event, dict) else getattr(event, "type", None)
+    event_data = event.get("data") if isinstance(event, dict) else getattr(event, "data", None)
+
+    if not event_id:
+        raise HTTPException(400, "No event id")
+
+    existing = db.query(WebhookEvent).filter(WebhookEvent.external_id == str(event_id)).first()
     if existing and existing.processed:
         return {"status": "already_processed"}
 
-    # Store webhook event
     webhook_event = WebhookEvent(
         provider="stripe",
-        event_type=event["type"],
-        external_id=event["id"],
-        payload_json=json.dumps(event["data"]),
+        event_type=str(event_type),
+        external_id=str(event_id),
+        payload_json=json.dumps(event_data, default=str) if event_data else "{}",
         processed=False,
     )
     db.add(webhook_event)
     db.flush()
 
-    # Process event
-    if event["type"] == "checkout.session.completed":
-        session_data = event["data"]["object"]
-        if session_data.get("payment_status") == "paid":
-            handle_checkout_completed(db, session_data)
+    if event_type == "checkout.session.completed":
+        session_data = event_data.get("object") if isinstance(event_data, dict) else getattr(event_data, "object", None)
+        if session_data:
+            payment_status = session_data.get("payment_status") if isinstance(session_data, dict) else getattr(session_data, "payment_status", None)
+            if payment_status == "paid":
+                session_dict = dict(session_data) if not isinstance(session_data, dict) else session_data
+                handle_checkout_completed(db, session_dict)
 
-    elif event["type"] == "checkout.session.expired":
-        session_data = event["data"]["object"]
-        session_id = session_data.get("id")
-        order = db.query(Order).filter(
-            Order.provider_session_id == session_id,
-            Order.status == OrderStatus.PENDING,
-        ).first()
-        if order:
-            order.status = OrderStatus.EXPIRED
-            # Release block reservation handled by cleanup
+    elif event_type == "checkout.session.expired":
+        session_data = event_data.get("object") if isinstance(event_data, dict) else getattr(event_data, "object", None)
+        if session_data:
+            session_id = session_data.get("id") if isinstance(session_data, dict) else getattr(session_data, "id", None)
+            if session_id:
+                order = db.query(Order).filter(
+                    Order.provider_session_id == session_id,
+                    Order.status == OrderStatus.PENDING,
+                ).first()
+                if order:
+                    order.status = OrderStatus.EXPIRED
 
     webhook_event.processed = True
     db.commit()
-
     return {"status": "ok"}
 
 
