@@ -175,13 +175,26 @@ export function LandingPage() {
 
       {/* Footer */}
       <footer className="border-t border-canvas-border py-10 px-6">
-        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2 text-canvas-muted">
-            <Grid3X3 size={16} className="text-neon-cyan" />
-            <span className="font-display font-semibold text-sm">PixelCanvas</span>
+        <div className="max-w-6xl mx-auto">
+          <div className="flex flex-col sm:flex-row items-start justify-between gap-8 mb-8">
+            <div className="flex items-center gap-2 text-canvas-muted">
+              <Grid3X3 size={16} className="text-neon-cyan" />
+              <span className="font-display font-semibold text-sm">PixelCanvas</span>
+            </div>
+            <div className="flex flex-wrap gap-6 text-xs text-canvas-muted">
+              <Link to="/offer" className="hover:text-canvas-bright transition-colors">Публичная оферта</Link>
+              <Link to="/contacts" className="hover:text-canvas-bright transition-colors">Контакты и реквизиты</Link>
+              <Link to="/refund" className="hover:text-canvas-bright transition-colors">Возврат</Link>
+              <Link to="/privacy" className="hover:text-canvas-bright transition-colors">Конфиденциальность</Link>
+            </div>
           </div>
-          <div className="text-xs text-canvas-muted">
-            &copy; {new Date().getFullYear()} PixelCanvas. All rights reserved.
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-6 border-t border-canvas-border/50">
+            <div className="text-xs text-canvas-muted">
+              &copy; {new Date().getFullYear()} PixelCanvas. Самозанятый Пронкин Сергей. ИНН: 250202459700
+            </div>
+            <div className="text-xs text-canvas-muted">
+              support@pixelcanvas.ru
+            </div>
           </div>
         </div>
       </footer>

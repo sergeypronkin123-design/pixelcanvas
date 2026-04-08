@@ -9,6 +9,7 @@ import { DashboardPage } from '@/pages/DashboardPage';
 import { MarketplacePage } from '@/pages/MarketplacePage';
 import { PurchaseSuccessPage, PurchaseCancelPage } from '@/pages/PurchasePages';
 import { AdminPage } from '@/pages/AdminPage';
+import { OfferPage, ContactsPage, RefundPage, PrivacyPage } from '@/pages/LegalPages';
 import '@/styles/globals.css';
 
 function App() {
@@ -39,6 +40,10 @@ function App() {
         <Route path="/purchase/success" element={<PurchaseSuccessPage />} />
         <Route path="/purchase/cancel" element={<PurchaseCancelPage />} />
         <Route path="/admin" element={<AdminPage />} />
+        <Route path="/offer" element={<OfferPage />} />
+        <Route path="/contacts" element={<ContactsPage />} />
+        <Route path="/refund" element={<RefundPage />} />
+        <Route path="/privacy" element={<PrivacyPage />} />
       </Routes>
     </BrowserRouter>
   );
