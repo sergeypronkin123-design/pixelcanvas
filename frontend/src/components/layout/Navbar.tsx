@@ -32,6 +32,11 @@ export function Navbar() {
                 <Link to="/profile" className="px-3 py-1.5 text-sm text-canvas-muted hover:text-canvas-bright hover:bg-canvas-elevated rounded-lg transition-all flex items-center gap-1">
                   <User size={13} /> {user.username}
                 </Link>
+                {user.is_admin && (
+                  <Link to="/admin" className="px-3 py-1.5 text-sm text-neon-amber/70 hover:text-neon-amber hover:bg-canvas-elevated rounded-lg transition-all">
+                    Admin
+                  </Link>
+                )}
                 <button onClick={handleLogout} className="px-3 py-1.5 text-sm text-canvas-muted hover:text-red-400 hover:bg-canvas-elevated rounded-lg transition-all">
                   <LogOut size={13} />
                 </button>

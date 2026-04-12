@@ -8,6 +8,7 @@ import { CanvasPage } from '@/pages/CanvasPage';
 import { ProfilePage } from '@/pages/ProfilePage';
 import { SubscribePage, SubscribeSuccessPage, SubscribeCancelPage } from '@/pages/SubscribePage';
 import { OfferPage, ContactsPage, RefundPage, PrivacyPage } from '@/pages/LegalPages';
+import { AdminPage } from '@/pages/AdminPage';
 import '@/styles/globals.css';
 
 function App() {
@@ -39,6 +40,7 @@ function App() {
         <Route path="/contacts" element={<ContactsPage />} />
         <Route path="/refund" element={<RefundPage />} />
         <Route path="/privacy" element={<PrivacyPage />} />
+        <Route path="/admin" element={<AdminPage />} />
       </Routes>
     </BrowserRouter>
   );

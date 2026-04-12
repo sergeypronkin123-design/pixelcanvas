@@ -65,7 +65,7 @@ export function SubscribePage() {
               <h3 className="font-display font-bold text-lg text-orange-400 mb-4 flex items-center gap-2">
                 <Crown size={18} /> Pro
               </h3>
-              <div className="text-3xl font-display font-black text-canvas-bright mb-1">$4.99 <span className="text-base font-normal text-canvas-muted">/ 499₽</span></div>
+              <div className="text-3xl font-display font-black text-canvas-bright mb-1">$2.99 <span className="text-base font-normal text-canvas-muted">/ 199₽</span></div>
               <div className="text-xs text-canvas-muted mb-6">на 30 дней</div>
               <ul className="space-y-3 text-sm text-canvas-muted mb-6">
                 <li className="flex items-center gap-2"><Zap size={14} className="text-orange-400" /> 1 пиксель каждые 5 секунд</li>
@@ -76,12 +76,12 @@ export function SubscribePage() {
               <div className="space-y-2">
                 <button onClick={() => handleSubscribe('stripe')} disabled={loading}
                   className="btn-primary w-full flex items-center justify-center gap-2">
-                  <CreditCard size={16} /> {loading ? '...' : 'Оплатить $4.99 (Card)'}
+                  <CreditCard size={16} /> {loading ? '...' : 'Оплатить $2.99 (Card)'}
                 </button>
                 <button onClick={() => handleSubscribe('yukassa')} disabled={loading}
                   className="w-full px-6 py-3 bg-neon-green/10 border border-neon-green/30 text-neon-green rounded-xl
                              font-display font-bold hover:bg-neon-green/20 transition-all disabled:opacity-40 flex items-center justify-center gap-2">
-                  {loading ? '...' : 'Оплатить 499₽ (ЮKassa)'}
+                  {loading ? '...' : 'Оплатить 199₽ (ЮKassa)'}
                 </button>
               </div>
             </div>

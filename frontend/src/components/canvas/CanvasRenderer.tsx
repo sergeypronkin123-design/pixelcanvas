@@ -3,20 +3,27 @@ import { api } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
 
 const PALETTE = [
-  '#FF0000', '#FF4500', '#FF8C00', '#FFD700', '#FFFF00',
-  '#7CFC00', '#00FF00', '#00FA9A', '#00FFFF', '#00BFFF',
-  '#0000FF', '#4B0082', '#8B00FF', '#FF00FF', '#FF1493',
-  '#FFFFFF', '#C0C0C0', '#808080', '#404040', '#000000',
-  '#8B4513', '#D2691E', '#F4A460', '#FFE4C4', '#FFC0CB',
+  '#FF0000','#FF4500','#FF8C00','#FFD700','#FFFF00',
+  '#7CFC00','#00FF00','#00FA9A','#00FFFF','#00BFFF',
+  '#0000FF','#4B0082','#8B00FF','#FF00FF','#FF1493',
+  '#FFFFFF','#C0C0C0','#808080','#404040','#000000',
+  '#8B4513','#D2691E','#F4A460','#FFE4C4','#FFC0CB',
 ];
 
-interface CanvasRendererProps {
+function hexToRgb(hex: string): [number, number, number] {
+  const v = parseInt(hex.slice(1), 16);
+  return [(v >> 16) & 255, (v >> 8) & 255, v & 255];
+}
+
+interface Props {
   battleActive: boolean;
   onPixelPlaced: () => void;
   pixelUpdates: { x: number; y: number; color: string }[];
 }
 
-export function CanvasRenderer({ battleActive, onPixelPlaced, pixelUpdates }: CanvasRendererProps) {
+const W = 1000, H = 1000;
+
+export function CanvasRenderer({ battleActive, onPixelPlaced, pixelUpdates }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const user = useAuthStore((s) => s.user);
 
@@ -25,83 +32,111 @@ export function CanvasRenderer({ battleActive, onPixelPlaced, pixelUpdates }: Ca
   const [cooldownRemaining, setCooldownRemaining] = useState(0);
   const [hoverPos, setHoverPos] = useState<{ x: number; y: number } | null>(null);
 
-  const pixelsRef = useRef<Map<string, string>>(new Map());
+  // Offscreen bitmap: 1000x1000 RGBA
+  const bitmapRef = useRef<ImageData | null>(null);
+  const offscreenRef = useRef<HTMLCanvasElement | null>(null);
   const viewportRef = useRef(viewport);
   const isDraggingRef = useRef(false);
   const dragStartRef = useRef({ x: 0, y: 0, vx: 0, vy: 0 });
   const hasDraggedRef = useRef(false);
   const animRef = useRef<number>();
   const lastLoadRef = useRef('');
+  const loadedRegions = useRef(new Set<string>());
 
   viewportRef.current = viewport;
 
-  // Apply websocket pixel updates
+  // Init offscreen canvas and bitmap
   useEffect(() => {
+    const off = document.createElement('canvas');
+    off.width = W; off.height = H;
+    offscreenRef.current = off;
+    const ctx = off.getContext('2d')!;
+    // Fill with dark background
+    ctx.fillStyle = '#1a1a24';
+    ctx.fillRect(0, 0, W, H);
+    bitmapRef.current = ctx.getImageData(0, 0, W, H);
+  }, []);
+
+  // Apply websocket pixel updates instantly to bitmap
+  useEffect(() => {
+    const bmp = bitmapRef.current;
+    const off = offscreenRef.current;
+    if (!bmp || !off) return;
+    let dirty = false;
     for (const p of pixelUpdates) {
-      pixelsRef.current.set(`${p.x},${p.y}`, p.color);
+      if (p.x < 0 || p.x >= W || p.y < 0 || p.y >= H) continue;
+      const [r, g, b] = hexToRgb(p.color);
+      const i = (p.y * W + p.x) * 4;
+      bmp.data[i] = r; bmp.data[i+1] = g; bmp.data[i+2] = b; bmp.data[i+3] = 255;
+      dirty = true;
+    }
+    if (dirty) {
+      off.getContext('2d')!.putImageData(bmp, 0, 0);
     }
   }, [pixelUpdates]);
 
-  // Load pixels for viewport
+  // Load pixels from API into bitmap
+  const loadRegion = useCallback((xMin: number, yMin: number, xMax: number, yMax: number) => {
+    const key = `${Math.floor(xMin/100)},${Math.floor(yMin/100)},${Math.floor(xMax/100)},${Math.floor(yMax/100)}`;
+    if (loadedRegions.current.has(key)) return;
+    loadedRegions.current.add(key);
+
+    api.getCanvas(xMin, yMin, xMax, yMax).then((data) => {
+      const bmp = bitmapRef.current;
+      const off = offscreenRef.current;
+      if (!bmp || !off) return;
+      for (const p of data.pixels) {
+        if (p.x < 0 || p.x >= W || p.y < 0 || p.y >= H) continue;
+        const [r, g, b] = hexToRgb(p.color);
+        const i = (p.y * W + p.x) * 4;
+        bmp.data[i] = r; bmp.data[i+1] = g; bmp.data[i+2] = b; bmp.data[i+3] = 255;
+      }
+      off.getContext('2d')!.putImageData(bmp, 0, 0);
+    }).catch(() => {});
+  }, []);
+
+  // Load visible viewport
   const loadViewport = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const vp = viewportRef.current;
     const rect = canvas.getBoundingClientRect();
-
-    const xMin = Math.max(0, Math.floor(-vp.x / vp.scale) - 10);
-    const yMin = Math.max(0, Math.floor(-vp.y / vp.scale) - 10);
-    const xMax = Math.min(1000, Math.ceil((rect.width - vp.x) / vp.scale) + 10);
-    const yMax = Math.min(1000, Math.ceil((rect.height - vp.y) / vp.scale) + 10);
-
-    const key = `${xMin},${yMin},${xMax},${yMax}`;
-    if (key === lastLoadRef.current) return;
-    lastLoadRef.current = key;
-
-    api.getCanvas(xMin, yMin, xMax, yMax).then((data) => {
-      for (const p of data.pixels) {
-        pixelsRef.current.set(`${p.x},${p.y}`, p.color);
-      }
-    }).catch(() => {});
-  }, []);
+    const xMin = Math.max(0, Math.floor(-vp.x / vp.scale) - 5);
+    const yMin = Math.max(0, Math.floor(-vp.y / vp.scale) - 5);
+    const xMax = Math.min(W, Math.ceil((rect.width - vp.x) / vp.scale) + 5);
+    const yMax = Math.min(H, Math.ceil((rect.height - vp.y) / vp.scale) + 5);
+    loadRegion(xMin, yMin, xMax, yMax);
+  }, [loadRegion]);
 
   const loadTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
   useEffect(() => {
     if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
-    loadTimeoutRef.current = setTimeout(loadViewport, 150);
+    loadTimeoutRef.current = setTimeout(loadViewport, 200);
   }, [viewport, loadViewport]);
-
   useEffect(() => { loadViewport(); }, [loadViewport]);
 
   // Cooldown timer
   useEffect(() => {
-    const interval = setInterval(() => {
-      setCooldownRemaining((prev) => Math.max(0, prev - 0.1));
-    }, 100);
+    const interval = setInterval(() => setCooldownRemaining((p) => Math.max(0, p - 0.1)), 100);
     return () => clearInterval(interval);
   }, []);
 
-  // Fetch initial cooldown
   useEffect(() => {
-    if (user) {
-      api.getCooldown().then((data) => {
-        setCooldownRemaining(data.remaining);
-      }).catch(() => {});
-    }
+    if (user) api.getCooldown().then((d) => setCooldownRemaining(d.remaining)).catch(() => {});
   }, [user]);
 
-  // Render loop
+  // Render loop — fast! Just draws the offscreen canvas scaled
   useEffect(() => {
     let running = true;
     const render = () => {
       if (!running) return;
       const canvas = canvasRef.current;
-      if (!canvas) { animRef.current = requestAnimationFrame(render); return; }
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
-
+      const off = offscreenRef.current;
+      if (!canvas || !off) { animRef.current = requestAnimationFrame(render); return; }
+      const ctx = canvas.getContext('2d')!;
       const rect = canvas.getBoundingClientRect();
       const dpr = window.devicePixelRatio || 1;
+
       if (canvas.width !== Math.floor(rect.width * dpr) || canvas.height !== Math.floor(rect.height * dpr)) {
         canvas.width = Math.floor(rect.width * dpr);
         canvas.height = Math.floor(rect.height * dpr);
@@ -109,52 +144,34 @@ export function CanvasRenderer({ battleActive, onPixelPlaced, pixelUpdates }: Ca
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       const vp = viewportRef.current;
 
-      // Background
-      ctx.fillStyle = '#111118';
+      // Clear
+      ctx.fillStyle = '#08080c';
       ctx.fillRect(0, 0, rect.width, rect.height);
 
+      // Draw the entire 1000x1000 bitmap in one call — FAST
+      ctx.imageSmoothingEnabled = false;
       ctx.save();
       ctx.translate(vp.x, vp.y);
       ctx.scale(vp.scale, vp.scale);
+      ctx.drawImage(off, 0, 0);
 
-      // Canvas boundary
-      ctx.fillStyle = '#1a1a24';
-      ctx.fillRect(0, 0, 1000, 1000);
-
-      // Grid lines when zoomed
-      if (vp.scale >= 4) {
-        ctx.strokeStyle = 'rgba(255,255,255,0.04)';
-        ctx.lineWidth = 0.5 / vp.scale;
-        for (let i = 0; i <= 1000; i++) {
-          ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, 1000); ctx.stroke();
-          ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(1000, i); ctx.stroke();
-        }
+      // Grid when zoomed in
+      if (vp.scale >= 6) {
+        const x1 = Math.max(0, Math.floor(-vp.x / vp.scale));
+        const y1 = Math.max(0, Math.floor(-vp.y / vp.scale));
+        const x2 = Math.min(W, Math.ceil((rect.width - vp.x) / vp.scale));
+        const y2 = Math.min(H, Math.ceil((rect.height - vp.y) / vp.scale));
+        ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+        ctx.lineWidth = 0.3 / vp.scale;
+        for (let x = x1; x <= x2; x++) { ctx.beginPath(); ctx.moveTo(x, y1); ctx.lineTo(x, y2); ctx.stroke(); }
+        for (let y = y1; y <= y2; y++) { ctx.beginPath(); ctx.moveTo(x1, y); ctx.lineTo(x2, y); ctx.stroke(); }
       }
 
-      // Draw pixels
-      const pixels = pixelsRef.current;
-      const xMin = Math.max(0, Math.floor(-vp.x / vp.scale));
-      const yMin = Math.max(0, Math.floor(-vp.y / vp.scale));
-      const xMax = Math.min(1000, Math.ceil((rect.width - vp.x) / vp.scale));
-      const yMax = Math.min(1000, Math.ceil((rect.height - vp.y) / vp.scale));
-
-      for (let x = xMin; x < xMax; x++) {
-        for (let y = yMin; y < yMax; y++) {
-          const color = pixels.get(`${x},${y}`);
-          if (color) {
-            ctx.fillStyle = color;
-            ctx.fillRect(x, y, 1, 1);
-          }
-        }
-      }
-
-      // Hover pixel highlight
+      // Hover highlight
       if (hoverPos && vp.scale >= 2) {
         ctx.strokeStyle = '#ffffff';
         ctx.lineWidth = 2 / vp.scale;
         ctx.strokeRect(hoverPos.x, hoverPos.y, 1, 1);
-
-        // Preview color
         ctx.fillStyle = selectedColor;
         ctx.globalAlpha = 0.5;
         ctx.fillRect(hoverPos.x, hoverPos.y, 1, 1);
@@ -163,14 +180,14 @@ export function CanvasRenderer({ battleActive, onPixelPlaced, pixelUpdates }: Ca
 
       ctx.restore();
 
-      // HUD bottom-left
+      // HUD
       ctx.fillStyle = 'rgba(0,0,0,0.7)';
-      ctx.fillRect(8, rect.height - 30, 200, 22);
+      ctx.fillRect(8, rect.height - 28, 180, 20);
       ctx.fillStyle = '#6b6b8a';
       ctx.font = '11px JetBrains Mono, monospace';
       const wx = hoverPos ? hoverPos.x : Math.floor(-vp.x / vp.scale);
       const wy = hoverPos ? hoverPos.y : Math.floor(-vp.y / vp.scale);
-      ctx.fillText(`${wx}, ${wy}  zoom: ${vp.scale.toFixed(1)}x`, 14, rect.height - 14);
+      ctx.fillText(`${wx}, ${wy}  ×${vp.scale.toFixed(1)}`, 14, rect.height - 13);
 
       animRef.current = requestAnimationFrame(render);
     };
@@ -183,7 +200,8 @@ export function CanvasRenderer({ battleActive, onPixelPlaced, pixelUpdates }: Ca
     const canvas = canvasRef.current;
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
-    setViewport({ x: rect.width / 2 - 500, y: rect.height / 2 - 500, scale: 1 });
+    const scale = Math.min(rect.width / W, rect.height / H) * 0.9;
+    setViewport({ x: (rect.width - W * scale) / 2, y: (rect.height - H * scale) / 2, scale });
   }, []);
 
   const screenToWorld = useCallback((sx: number, sy: number) => {
@@ -191,19 +209,29 @@ export function CanvasRenderer({ battleActive, onPixelPlaced, pixelUpdates }: Ca
     return { x: Math.floor((sx - vp.x) / vp.scale), y: Math.floor((sy - vp.y) / vp.scale) };
   }, []);
 
-  // Place pixel on click
+  // Place pixel
   const handlePlace = useCallback(async (wx: number, wy: number) => {
     if (!user || !battleActive || cooldownRemaining > 0) return;
-    if (wx < 0 || wx >= 1000 || wy < 0 || wy >= 1000) return;
+    if (wx < 0 || wx >= W || wy < 0 || wy >= H) return;
+
+    // Instant local update
+    const bmp = bitmapRef.current;
+    const off = offscreenRef.current;
+    if (bmp && off) {
+      const [r, g, b] = hexToRgb(selectedColor);
+      const i = (wy * W + wx) * 4;
+      bmp.data[i] = r; bmp.data[i+1] = g; bmp.data[i+2] = b; bmp.data[i+3] = 255;
+      off.getContext('2d')!.putImageData(bmp, 0, 0);
+    }
+
     try {
       const res = await api.placePixel(wx, wy, selectedColor);
-      pixelsRef.current.set(`${wx},${wy}`, selectedColor);
       setCooldownRemaining(res.cooldown);
       onPixelPlaced();
     } catch (e: any) {
       if (e.message.includes('Wait')) {
-        const match = e.message.match(/([\d.]+)s/);
-        if (match) setCooldownRemaining(parseFloat(match[1]));
+        const m = e.message.match(/([\d.]+)s/);
+        if (m) setCooldownRemaining(parseFloat(m[1]));
       }
     }
   }, [user, battleActive, cooldownRemaining, selectedColor, onPixelPlaced]);
@@ -218,23 +246,17 @@ export function CanvasRenderer({ battleActive, onPixelPlaced, pixelUpdates }: Ca
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     const rect = canvasRef.current?.getBoundingClientRect();
     if (!rect) return;
-    const sx = e.clientX - rect.left;
-    const sy = e.clientY - rect.top;
+    const sx = e.clientX - rect.left, sy = e.clientY - rect.top;
 
     if (isDraggingRef.current) {
-      const dx = e.clientX - dragStartRef.current.x;
-      const dy = e.clientY - dragStartRef.current.y;
+      const dx = e.clientX - dragStartRef.current.x, dy = e.clientY - dragStartRef.current.y;
       if (Math.abs(dx) > 3 || Math.abs(dy) > 3) hasDraggedRef.current = true;
       setViewport(v => ({ ...v, x: dragStartRef.current.vx + dx, y: dragStartRef.current.vy + dy }));
       return;
     }
 
-    const world = screenToWorld(sx, sy);
-    if (world.x >= 0 && world.x < 1000 && world.y >= 0 && world.y < 1000) {
-      setHoverPos(world);
-    } else {
-      setHoverPos(null);
-    }
+    const w = screenToWorld(sx, sy);
+    setHoverPos(w.x >= 0 && w.x < W && w.y >= 0 && w.y < H ? w : null);
   }, [screenToWorld]);
 
   const handleMouseUp = useCallback((e: React.MouseEvent) => {
@@ -243,8 +265,8 @@ export function CanvasRenderer({ battleActive, onPixelPlaced, pixelUpdates }: Ca
     if (!wasDrag) {
       const rect = canvasRef.current?.getBoundingClientRect();
       if (!rect) return;
-      const world = screenToWorld(e.clientX - rect.left, e.clientY - rect.top);
-      handlePlace(world.x, world.y);
+      const w = screenToWorld(e.clientX - rect.left, e.clientY - rect.top);
+      handlePlace(w.x, w.y);
     }
   }, [screenToWorld, handlePlace]);
 
@@ -252,41 +274,31 @@ export function CanvasRenderer({ battleActive, onPixelPlaced, pixelUpdates }: Ca
     e.preventDefault();
     const rect = canvasRef.current?.getBoundingClientRect();
     if (!rect) return;
-    const sx = e.clientX - rect.left;
-    const sy = e.clientY - rect.top;
+    const sx = e.clientX - rect.left, sy = e.clientY - rect.top;
     const vp = viewportRef.current;
-    const factor = e.deltaY < 0 ? 1.15 : 0.87;
-    const newScale = Math.min(Math.max(vp.scale * factor, 0.3), 40);
-    const wx = (sx - vp.x) / vp.scale;
-    const wy = (sy - vp.y) / vp.scale;
-    setViewport({ scale: newScale, x: sx - wx * newScale, y: sy - wy * newScale });
+    const f = e.deltaY < 0 ? 1.15 : 0.87;
+    const ns = Math.min(Math.max(vp.scale * f, 0.3), 50);
+    const wx = (sx - vp.x) / vp.scale, wy = (sy - vp.y) / vp.scale;
+    setViewport({ scale: ns, x: sx - wx * ns, y: sy - wy * ns });
   }, []);
 
-  const cooldownPct = user
-    ? Math.min(100, (cooldownRemaining / (user.is_subscriber ? 5 : 30)) * 100)
-    : 0;
+  const cooldownPct = user ? Math.min(100, (cooldownRemaining / (user.is_subscriber ? 5 : 30)) * 100) : 0;
 
   return (
     <div className="w-full h-full relative">
-      <canvas
-        ref={canvasRef}
-        className="w-full h-full cursor-crosshair"
-        style={{ touchAction: 'none' }}
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
+      <canvas ref={canvasRef} className="w-full h-full cursor-crosshair" style={{ touchAction: 'none' }}
+        onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp}
         onMouseLeave={() => { isDraggingRef.current = false; setHoverPos(null); }}
         onWheel={handleWheel}
       />
 
-      {/* Color palette */}
+      {/* Palette */}
       <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-30 glass rounded-2xl px-3 py-2 flex items-center gap-2">
         <div className="flex flex-wrap gap-1 max-w-[320px]">
           {PALETTE.map((c) => (
             <button key={c} onClick={() => setSelectedColor(c)}
               className={`w-6 h-6 rounded border-2 transition-all hover:scale-110 ${selectedColor === c ? 'border-white scale-110 shadow-[0_0_8px_rgba(255,255,255,0.4)]' : 'border-transparent'}`}
-              style={{ backgroundColor: c }}
-            />
+              style={{ backgroundColor: c }} />
           ))}
         </div>
         <div className="pl-2 border-l border-canvas-border">
@@ -296,8 +308,6 @@ export function CanvasRenderer({ battleActive, onPixelPlaced, pixelUpdates }: Ca
                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
           </label>
         </div>
-
-        {/* Cooldown indicator */}
         {user && (
           <div className="pl-2 border-l border-canvas-border flex items-center gap-2 min-w-[80px]">
             {cooldownRemaining > 0 ? (
@@ -307,8 +317,10 @@ export function CanvasRenderer({ battleActive, onPixelPlaced, pixelUpdates }: Ca
                 </div>
                 <span className="text-xs font-mono text-orange-400">{cooldownRemaining.toFixed(1)}s</span>
               </div>
-            ) : (
+            ) : battleActive ? (
               <span className="text-xs font-mono text-neon-green">Ready!</span>
+            ) : (
+              <span className="text-xs font-mono text-canvas-muted">Батл не активен</span>
             )}
           </div>
         )}
