@@ -9,14 +9,25 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${API}${path}`, { ...options, headers: { ...headers, ...(options?.headers as Record<string, string>) } });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: 'Request failed' }));
-    throw new Error(err.detail || `HTTP ${res.status}`);
+    // Handle different error formats
+    let message = 'Request failed';
+    if (typeof err.detail === 'string') {
+      message = err.detail;
+    } else if (Array.isArray(err.detail)) {
+      message = err.detail.map((e: any) => e.msg || e.message || String(e)).join(', ');
+    } else if (typeof err.detail === 'object' && err.detail !== null) {
+      message = err.detail.msg || err.detail.message || JSON.stringify(err.detail);
+    } else if (typeof err.message === 'string') {
+      message = err.message;
+    }
+    throw new Error(message);
   }
   return res.json();
 }
 
 export const api = {
-  register: (email: string, username: string, password: string) =>
-    request<any>('/api/auth/register', { method: 'POST', body: JSON.stringify({ email, username, password }) }),
+  register: (email: string, username: string, password: string, ref?: string) =>
+    request<any>('/api/auth/register', { method: 'POST', body: JSON.stringify({ email, username, password, ref: ref || null }) }),
   login: (email: string, password: string) =>
     request<any>('/api/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
   getMe: () => request<any>('/api/auth/me'),

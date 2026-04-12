@@ -56,10 +56,14 @@ export function RegisterPage() {
   const { setAuth } = useAuthStore();
   const navigate = useNavigate();
 
+  // Get ref code from URL
+  const searchParams = new URLSearchParams(window.location.search);
+  const refCode = searchParams.get('ref') || undefined;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault(); setLoading(true); setError('');
     try {
-      const res = await api.register(email, username, password);
+      const res = await api.register(email, username, password, refCode);
       setAuth(res.user, res.access_token);
       navigate('/canvas');
     } catch (err: any) { setError(err.message); } finally { setLoading(false); }
