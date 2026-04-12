@@ -76,12 +76,12 @@ export function SubscribePage() {
               <div className="space-y-2">
                 <button onClick={() => handleSubscribe('stripe')} disabled={loading}
                   className="btn-primary w-full flex items-center justify-center gap-2">
-                  <CreditCard size={16} /> {loading ? '...' : 'Оплатить $2.99 (Card)'}
+                  <CreditCard size={16} /> {loading ? '...' : '$2.99 картой'}
                 </button>
                 <button onClick={() => handleSubscribe('yukassa')} disabled={loading}
                   className="w-full px-6 py-3 bg-neon-green/10 border border-neon-green/30 text-neon-green rounded-xl
                              font-display font-bold hover:bg-neon-green/20 transition-all disabled:opacity-40 flex items-center justify-center gap-2">
-                  {loading ? '...' : 'Оплатить 199₽ (ЮKassa)'}
+                  {loading ? '...' : '199₽ ЮKassa'}
                 </button>
               </div>
             </div>

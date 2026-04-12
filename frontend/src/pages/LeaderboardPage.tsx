@@ -105,7 +105,7 @@ export function LeaderboardPage() {
                     initial={{ x: -20, opacity: 0 }}
                     animate={{ x: 0, opacity: 1 }}
                     transition={{ delay: i * 0.03 }}
-                    className={`card !p-3 flex items-center gap-3 ${isMe ? 'border-orange-500/30 bg-orange-500/5' : ''}`}
+                    className={`card !p-2 sm:!p-3 flex items-center gap-2 sm:gap-3 ${isMe ? 'border-orange-500/30 bg-orange-500/5' : ''}`}
                   >
                     {/* Rank number */}
                     <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-display font-bold text-sm

@@ -84,7 +84,7 @@ export function ProfilePage() {
           </div>
 
           {/* Stats */}
-          <div className="grid grid-cols-3 gap-3 mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
             <div className="card !p-4 text-center">
               <Crosshair size={18} className="text-orange-400 mx-auto mb-2" />
               <div className="text-xl font-display font-bold text-canvas-bright">{pixels.toLocaleString()}</div>

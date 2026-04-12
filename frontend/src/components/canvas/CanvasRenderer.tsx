@@ -283,6 +283,9 @@ export function CanvasRenderer({ battleActive, onPixelPlaced, pixelUpdates }: Pr
   }, []);
 
   const cooldownPct = user ? Math.min(100, (cooldownRemaining / (user.is_subscriber ? 5 : 30)) * 100) : 0;
+  const [paletteOpen, setPaletteOpen] = useState(false);
+
+  const lastPinchDistRef = useRef(0);
 
   return (
     <div className="w-full h-full relative">
@@ -290,40 +293,114 @@ export function CanvasRenderer({ battleActive, onPixelPlaced, pixelUpdates }: Pr
         onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp}
         onMouseLeave={() => { isDraggingRef.current = false; setHoverPos(null); }}
         onWheel={handleWheel}
+        onTouchStart={(e) => {
+          if (e.touches.length === 2) {
+            // Pinch start
+            const dx = e.touches[0].clientX - e.touches[1].clientX;
+            const dy = e.touches[0].clientY - e.touches[1].clientY;
+            lastPinchDistRef.current = Math.sqrt(dx * dx + dy * dy);
+            hasDraggedRef.current = true;
+            return;
+          }
+          const t = e.touches[0];
+          isDraggingRef.current = true;
+          hasDraggedRef.current = false;
+          const vp = viewportRef.current;
+          dragStartRef.current = { x: t.clientX, y: t.clientY, vx: vp.x, vy: vp.y };
+        }}
+        onTouchMove={(e) => {
+          if (e.touches.length === 2) {
+            // Pinch zoom
+            const dx = e.touches[0].clientX - e.touches[1].clientX;
+            const dy = e.touches[0].clientY - e.touches[1].clientY;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (lastPinchDistRef.current > 0) {
+              const factor = dist / lastPinchDistRef.current;
+              const cx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+              const cy = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+              const rect = canvasRef.current?.getBoundingClientRect();
+              if (rect) {
+                const sx = cx - rect.left, sy = cy - rect.top;
+                const vp = viewportRef.current;
+                const ns = Math.min(Math.max(vp.scale * factor, 0.3), 50);
+                const wx = (sx - vp.x) / vp.scale, wy = (sy - vp.y) / vp.scale;
+                setViewport({ scale: ns, x: sx - wx * ns, y: sy - wy * ns });
+              }
+            }
+            lastPinchDistRef.current = dist;
+            hasDraggedRef.current = true;
+            return;
+          }
+          const t = e.touches[0];
+          const dx = t.clientX - dragStartRef.current.x, dy = t.clientY - dragStartRef.current.y;
+          if (Math.abs(dx) > 3 || Math.abs(dy) > 3) hasDraggedRef.current = true;
+          setViewport(v => ({ ...v, x: dragStartRef.current.vx + dx, y: dragStartRef.current.vy + dy }));
+        }}
+        onTouchEnd={(e) => {
+          lastPinchDistRef.current = 0;
+          const wasDrag = hasDraggedRef.current;
+          isDraggingRef.current = false;
+          if (!wasDrag && e.changedTouches[0]) {
+            const t = e.changedTouches[0];
+            const rect = canvasRef.current?.getBoundingClientRect();
+            if (rect) {
+              const w = screenToWorld(t.clientX - rect.left, t.clientY - rect.top);
+              handlePlace(w.x, w.y);
+            }
+          }
+        }}
       />
 
-      {/* Palette */}
-      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-30 glass rounded-2xl px-3 py-2 flex items-center gap-2">
-        <div className="flex flex-wrap gap-1 max-w-[320px]">
-          {PALETTE.map((c) => (
-            <button key={c} onClick={() => setSelectedColor(c)}
-              className={`w-6 h-6 rounded border-2 transition-all hover:scale-110 ${selectedColor === c ? 'border-white scale-110 shadow-[0_0_8px_rgba(255,255,255,0.4)]' : 'border-transparent'}`}
-              style={{ backgroundColor: c }} />
-          ))}
-        </div>
-        <div className="pl-2 border-l border-canvas-border">
-          <label className="relative cursor-pointer">
-            <div className="w-7 h-7 rounded-lg border-2 border-canvas-border" style={{ backgroundColor: selectedColor }} />
+      {/* Bottom toolbar */}
+      <div className="absolute bottom-3 left-2 right-2 z-30 flex flex-col items-center gap-2">
+        {/* Expanded palette */}
+        {paletteOpen && (
+          <div className="glass rounded-2xl px-3 py-2 w-fit max-w-[95vw]">
+            <div className="grid grid-cols-10 gap-1">
+              {PALETTE.map((c) => (
+                <button key={c} onClick={() => { setSelectedColor(c); setPaletteOpen(false); }}
+                  className={`w-7 h-7 sm:w-6 sm:h-6 rounded border-2 transition-all ${selectedColor === c ? 'border-white scale-110 shadow-[0_0_8px_rgba(255,255,255,0.4)]' : 'border-transparent'}`}
+                  style={{ backgroundColor: c }} />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Main toolbar */}
+        <div className="glass rounded-2xl px-3 py-2 flex items-center gap-2 w-fit">
+          {/* Selected color + toggle */}
+          <button onClick={() => setPaletteOpen(!paletteOpen)}
+            className="w-8 h-8 rounded-lg border-2 border-canvas-border hover:border-white transition-all flex-shrink-0"
+            style={{ backgroundColor: selectedColor }}
+          />
+
+          {/* Custom color picker */}
+          <label className="relative cursor-pointer flex-shrink-0">
+            <div className="w-8 h-8 rounded-lg border-2 border-dashed border-canvas-border flex items-center justify-center text-canvas-muted text-xs">
+              +
+            </div>
             <input type="color" value={selectedColor} onChange={(e) => setSelectedColor(e.target.value)}
                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
           </label>
+
+          {/* Cooldown */}
+          {user && (
+            <div className="pl-2 border-l border-canvas-border flex items-center gap-1.5">
+              {cooldownRemaining > 0 ? (
+                <>
+                  <div className="w-12 sm:w-16 h-2 bg-canvas-bg rounded-full overflow-hidden">
+                    <div className="h-full bg-orange-500 rounded-full transition-all" style={{ width: `${100 - cooldownPct}%` }} />
+                  </div>
+                  <span className="text-xs font-mono text-orange-400">{cooldownRemaining.toFixed(0)}s</span>
+                </>
+              ) : battleActive ? (
+                <span className="text-xs font-mono text-neon-green">Ready!</span>
+              ) : (
+                <span className="text-xs font-mono text-canvas-muted">Пауза</span>
+              )}
+            </div>
+          )}
         </div>
-        {user && (
-          <div className="pl-2 border-l border-canvas-border flex items-center gap-2 min-w-[80px]">
-            {cooldownRemaining > 0 ? (
-              <div className="flex items-center gap-1.5">
-                <div className="w-16 h-2 bg-canvas-bg rounded-full overflow-hidden">
-                  <div className="h-full bg-orange-500 rounded-full transition-all" style={{ width: `${100 - cooldownPct}%` }} />
-                </div>
-                <span className="text-xs font-mono text-orange-400">{cooldownRemaining.toFixed(1)}s</span>
-              </div>
-            ) : battleActive ? (
-              <span className="text-xs font-mono text-neon-green">Ready!</span>
-            ) : (
-              <span className="text-xs font-mono text-canvas-muted">Батл не активен</span>
-            )}
-          </div>
-        )}
       </div>
     </div>
   );

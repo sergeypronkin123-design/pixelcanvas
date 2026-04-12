@@ -68,6 +68,9 @@ export function Navbar() {
                 <>
                   <Link to="/referral" onClick={() => setOpen(false)} className="block px-3 py-2 text-sm text-neon-green rounded-lg">Пригласить друзей</Link>
                   <Link to="/profile" onClick={() => setOpen(false)} className="block px-3 py-2 text-sm text-canvas-muted rounded-lg">Профиль</Link>
+                  {user.is_admin && (
+                    <Link to="/admin" onClick={() => setOpen(false)} className="block px-3 py-2 text-sm text-neon-amber rounded-lg">Админ</Link>
+                  )}
                   <button onClick={() => { handleLogout(); setOpen(false); }} className="block w-full text-left px-3 py-2 text-sm text-red-400 rounded-lg">Выйти</button>
                 </>
               ) : (

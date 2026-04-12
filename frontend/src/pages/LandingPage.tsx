@@ -43,7 +43,7 @@ export function LandingPage() {
               </div>
             )}
 
-            <h1 className="font-display font-black text-5xl sm:text-7xl lg:text-8xl tracking-tight leading-[0.9] mb-6">
+            <h1 className="font-display font-black text-4xl sm:text-6xl lg:text-8xl tracking-tight leading-[0.9] mb-6">
               <span className="text-canvas-bright">Pixel</span>
               <br />
               <span className="bg-gradient-to-r from-orange-400 via-red-500 to-pink-500 bg-clip-text text-transparent">

@@ -58,42 +58,34 @@ export function CanvasPage() {
       <Navbar />
 
       {/* HUD bar */}
-      <div className="fixed top-14 left-0 right-0 z-40 flex items-center justify-between px-3 py-1.5 glass text-xs">
-        <div className="flex items-center gap-3">
+      <div className="fixed top-14 left-0 right-0 z-40 flex items-center justify-between px-2 sm:px-3 py-1 glass text-[10px] sm:text-xs overflow-x-auto">
+        <div className="flex items-center gap-1.5 sm:gap-3 flex-shrink-0">
           {status?.is_active ? (
-            <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-500/10 border border-red-500/30">
-              <Swords size={11} className="text-red-400" />
-              <span className="font-display font-bold text-red-400">BATTLE</span>
+            <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-red-500/10 border border-red-500/30">
+              <Swords size={10} className="text-red-400" />
+              <span className="font-display font-bold text-red-400 hidden sm:inline">BATTLE</span>
             </div>
           ) : (
-            <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-canvas-elevated border border-canvas-border">
-              <Lock size={11} className="text-canvas-muted" />
-              <span className="font-display text-canvas-muted">Перерыв</span>
+            <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-canvas-elevated border border-canvas-border">
+              <Lock size={10} className="text-canvas-muted" />
             </div>
           )}
           <div className="flex items-center gap-1">
-            <Clock size={11} className="text-orange-400" />
-            <span className="font-mono text-canvas-bright">
-              {status?.is_active ? 'Конец: ' : 'Старт: '}
-              <span className="text-orange-400 font-bold">{timeLeft}</span>
-            </span>
+            <Clock size={10} className="text-orange-400" />
+            <span className="font-mono text-orange-400 font-bold">{timeLeft}</span>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          {/* Rank badge */}
+        <div className="flex items-center gap-1.5 sm:gap-3 flex-shrink-0">
           {user && (
-            <Link to="/profile" className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-canvas-elevated border border-canvas-border hover:border-orange-500/30 transition-all">
-              <span className="text-xs">{rank.emoji}</span>
-              <span className="font-display font-semibold" style={{ color: rank.color }}>{rank.nameRu}</span>
-              <span className="font-mono text-canvas-muted ml-1">{totalPixels}</span>
+            <Link to="/profile" className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-canvas-elevated border border-canvas-border">
+              <span className="text-[10px]">{rank.emoji}</span>
+              <span className="font-mono text-canvas-muted">{totalPixels}</span>
             </Link>
           )}
 
-          {/* Online */}
           <div className="flex items-center gap-1">
             <div className="w-1.5 h-1.5 rounded-full bg-neon-green animate-pulse" />
-            <Users size={11} className="text-canvas-muted" />
             <span className="font-mono text-canvas-bright">{onlineCount}</span>
           </div>
 
