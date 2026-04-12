@@ -61,14 +61,14 @@ export function DashboardPage() {
               Dashboard
             </h1>
             <p className="text-canvas-muted">
-              Welcome, <span className="text-neon-cyan">{user.username}</span>
+              Welcome, <span className="text-neon-amber">{user.username}</span>
             </p>
           </div>
 
           {/* Stats */}
           <div className="grid grid-cols-3 gap-4 mb-10">
             <div className="card flex items-center gap-4">
-              <div className="p-3 rounded-xl bg-neon-cyan/10"><Grid3X3 className="text-neon-cyan" size={22} /></div>
+              <div className="p-3 rounded-xl bg-neon-cyan/10"><Grid3X3 className="text-neon-amber" size={22} /></div>
               <div>
                 <div className="text-2xl font-display font-bold text-canvas-bright">{blocks.length}</div>
                 <div className="text-xs text-canvas-muted">Blocks Owned</div>
@@ -130,7 +130,7 @@ export function DashboardPage() {
                         </div>
                         <div className="text-right">
                           <div className="text-sm text-canvas-bright font-mono">${(b.current_price / 100).toFixed(2)}</div>
-                          <Link to="/canvas" className="text-xs text-neon-cyan hover:underline">View</Link>
+                          <Link to="/canvas" className="text-xs text-neon-amber hover:underline">View</Link>
                         </div>
                       </div>
                     ))

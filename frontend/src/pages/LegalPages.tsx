@@ -14,18 +14,18 @@ export function OfferPage() {
             <p className="text-canvas-muted">Дата публикации: 08 апреля 2026 г.</p>
 
             <h2 className="font-display font-semibold text-xl text-canvas-bright mt-8">1. Общие положения</h2>
-            <p>Настоящая публичная оферта (далее — «Оферта») является официальным предложением Администрации платформы PixelCanvas, далее именуемой «Продавец», адресованным любому физическому лицу, далее именуемому «Покупатель», заключить договор купли-продажи цифровых товаров на условиях, изложенных ниже. Полные реквизиты Продавца доступны по запросу на email: support@pixelcanvas.ru.</p>
-            <p>Оферта считается принятой (акцептованной) с момента совершения Покупателем оплаты любого товара на сайте PixelCanvas (https://gregarious-froyo-e092ae.netlify.app).</p>
+            <p>Настоящая публичная оферта (далее — «Оферта») является официальным предложением Администрации платформы PixelStake, далее именуемой «Продавец», адресованным любому физическому лицу, далее именуемому «Покупатель», заключить договор купли-продажи цифровых товаров на условиях, изложенных ниже. Полные реквизиты Продавца доступны по запросу на email: support@pixelstake.ru.</p>
+            <p>Оферта считается принятой (акцептованной) с момента совершения Покупателем оплаты любого товара на сайте PixelStake (https://pixelstake.ru).</p>
 
             <h2 className="font-display font-semibold text-xl text-canvas-bright mt-8">2. Предмет договора</h2>
-            <p>Продавец предоставляет Покупателю право владения цифровыми блоками пикселей на общей интерактивной онлайн-платформе PixelCanvas. Каждый блок представляет собой область размером 10×10 пикселей на общем холсте.</p>
+            <p>Продавец предоставляет Покупателю право владения цифровыми блоками пикселей на общей интерактивной онлайн-платформе PixelStake. Каждый блок представляет собой область размером 10×10 пикселей на общем холсте.</p>
             <p>Покупатель получает следующие права:</p>
             <p>— Право рисовать (размещать изображения) внутри приобретённых блоков;</p>
             <p>— Право выставлять приобретённые блоки на перепродажу другим пользователям через встроенный маркетплейс;</p>
             <p>— Право владения блоком на неограниченный срок, пока платформа функционирует.</p>
 
             <h2 className="font-display font-semibold text-xl text-canvas-bright mt-8">3. Описание товара и цены</h2>
-            <p>Товаром является цифровой блок пикселей на платформе PixelCanvas. Цена каждого блока определяется автоматически на основе его расположения на холсте и текущей заполненности платформы. Цена указывается на странице покупки перед совершением оплаты.</p>
+            <p>Товаром является цифровой блок пикселей на платформе PixelStake. Цена каждого блока определяется автоматически на основе его расположения на холсте и текущей заполненности платформы. Цена указывается на странице покупки перед совершением оплаты.</p>
             <p>Цены указаны в долларах США (при оплате через Stripe) или в рублях РФ (при оплате через ЮKassa). Продавец оставляет за собой право изменять цены на нераспроданные блоки без предварительного уведомления.</p>
 
             <h2 className="font-display font-semibold text-xl text-canvas-bright mt-8">4. Порядок оплаты</h2>
@@ -101,7 +101,7 @@ export function ContactsPage() {
               <div className="space-y-3 text-sm">
                 <div className="flex justify-between border-b border-canvas-border pb-3">
                   <span className="text-canvas-muted">Email</span>
-                  <span className="text-neon-cyan">support@pixelcanvas.ru</span>
+                  <span className="text-neon-amber">support@pixelstake.ru</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-canvas-muted">Время ответа</span>
@@ -113,7 +113,7 @@ export function ContactsPage() {
             <div className="card">
               <h2 className="font-display font-semibold text-lg text-canvas-bright mb-4">О платформе</h2>
               <p className="text-sm text-canvas-muted leading-relaxed">
-                PixelCanvas — интерактивная онлайн-платформа, на которой пользователи могут приобретать цифровые блоки пикселей,
+                PixelStake — интерактивная онлайн-платформа, на которой пользователи могут приобретать цифровые блоки пикселей,
                 создавать изображения внутри своих блоков и торговать ими на встроенном маркетплейсе.
                 Все товары являются цифровыми и предоставляются мгновенно после оплаты.
               </p>
@@ -122,9 +122,9 @@ export function ContactsPage() {
             <div className="card">
               <h2 className="font-display font-semibold text-lg text-canvas-bright mb-4">Юридическая информация</h2>
               <div className="space-y-2 text-sm">
-                <Link to="/offer" className="block text-neon-cyan hover:underline">→ Публичная оферта</Link>
-                <Link to="/privacy" className="block text-neon-cyan hover:underline">→ Политика конфиденциальности</Link>
-                <Link to="/refund" className="block text-neon-cyan hover:underline">→ Политика возврата</Link>
+                <Link to="/offer" className="block text-neon-amber hover:underline">→ Публичная оферта</Link>
+                <Link to="/privacy" className="block text-neon-amber hover:underline">→ Политика конфиденциальности</Link>
+                <Link to="/refund" className="block text-neon-amber hover:underline">→ Политика возврата</Link>
               </div>
             </div>
 
@@ -147,7 +147,7 @@ export function RefundPage() {
             <p className="text-canvas-muted">Дата публикации: 08 апреля 2026 г.</p>
 
             <h2 className="font-display font-semibold text-xl text-canvas-bright mt-8">1. Общие положения</h2>
-            <p>Все товары на платформе PixelCanvas являются цифровыми (блоки пикселей) и предоставляются мгновенно после оплаты. В связи с этим, согласно ст. 26.1 Закона РФ «О защите прав потребителей», возврат цифрового товара надлежащего качества не предусмотрен.</p>
+            <p>Все товары на платформе PixelStake являются цифровыми (блоки пикселей) и предоставляются мгновенно после оплаты. В связи с этим, согласно ст. 26.1 Закона РФ «О защите прав потребителей», возврат цифрового товара надлежащего качества не предусмотрен.</p>
 
             <h2 className="font-display font-semibold text-xl text-canvas-bright mt-8">2. Случаи, когда возврат возможен</h2>
             <p>Возврат денежных средств осуществляется в следующих случаях:</p>
@@ -156,7 +156,7 @@ export function RefundPage() {
             <p>— Оплата была произведена, но платформа не подтвердила получение платежа.</p>
 
             <h2 className="font-display font-semibold text-xl text-canvas-bright mt-8">3. Как запросить возврат</h2>
-            <p>Для запроса возврата напишите на email: support@pixelcanvas.ru. В обращении укажите:</p>
+            <p>Для запроса возврата напишите на email: support@pixelstake.ru. В обращении укажите:</p>
             <p>— Ваш логин (имя пользователя) на платформе;</p>
             <p>— Дату и сумму платежа;</p>
             <p>— Описание проблемы.</p>
@@ -183,7 +183,7 @@ export function PrivacyPage() {
             <p className="text-canvas-muted">Дата публикации: 08 апреля 2026 г.</p>
 
             <h2 className="font-display font-semibold text-xl text-canvas-bright mt-8">1. Какие данные собираются</h2>
-            <p>При регистрации и использовании платформы PixelCanvas собираются следующие данные:</p>
+            <p>При регистрации и использовании платформы PixelStake собираются следующие данные:</p>
             <p>— Адрес электронной почты;</p>
             <p>— Имя пользователя (логин);</p>
             <p>— Данные о совершённых покупках (блоки, суммы, даты).</p>
@@ -205,7 +205,7 @@ export function PrivacyPage() {
             <p>Пароли хранятся в зашифрованном виде (bcrypt). Соединение с сайтом защищено SSL-сертификатом (HTTPS). Доступ к базе данных ограничен и защищён.</p>
 
             <h2 className="font-display font-semibold text-xl text-canvas-bright mt-8">5. Права пользователя</h2>
-            <p>Пользователь имеет право запросить удаление своей учётной записи и всех связанных данных, написав на email: support@pixelcanvas.ru. Запрос обрабатывается в течение 5 рабочих дней.</p>
+            <p>Пользователь имеет право запросить удаление своей учётной записи и всех связанных данных, написав на email: support@pixelstake.ru. Запрос обрабатывается в течение 5 рабочих дней.</p>
 
             <h2 className="font-display font-semibold text-xl text-canvas-bright mt-8">6. Cookies</h2>
             <p>Платформа использует только технические cookies (токен авторизации), необходимые для работы сайта. Рекламные и аналитические cookies не используются.</p>

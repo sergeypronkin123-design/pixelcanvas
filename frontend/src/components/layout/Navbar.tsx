@@ -1,6 +1,6 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/stores/authStore';
-import { Grid3X3, User, ShoppingBag, LogOut, Shield, Menu, X } from 'lucide-react';
+import { Crosshair, User, ShoppingBag, LogOut, Shield, Menu, X } from 'lucide-react';
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -19,12 +19,12 @@ export function Navbar() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
         <div className="flex items-center justify-between h-16">
           <Link to="/" className="flex items-center gap-2.5 group">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-neon-cyan to-neon-magenta flex items-center justify-center">
-              <Grid3X3 size={18} className="text-white" />
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-500 to-red-600 flex items-center justify-center">
+              <Crosshair size={18} className="text-white" />
             </div>
             <span className="font-display font-bold text-lg tracking-tight text-canvas-bright
-                           group-hover:text-neon-cyan transition-colors">
-              PixelCanvas
+                           group-hover:text-neon-amber transition-colors">
+              Pixel<span className="text-neon-amber">Stake</span>
             </span>
           </Link>
 
@@ -58,7 +58,10 @@ export function Navbar() {
                 </button>
               </>
             ) : (
-              <Link to="/login" className="btn-primary text-sm !px-5 !py-2">
+              <Link to="/login" className="px-5 py-2 bg-neon-amber/10 border border-neon-amber/40 text-neon-amber rounded-lg
+                           font-display font-semibold text-sm tracking-wide
+                           hover:bg-neon-amber/20 hover:border-neon-amber/70
+                           transition-all duration-200">
                 Sign In
               </Link>
             )}
@@ -81,29 +84,19 @@ export function Navbar() {
           >
             <div className="px-4 py-3 space-y-1">
               <Link to="/canvas" onClick={() => setMobileOpen(false)}
-                    className="block px-4 py-2.5 text-sm text-canvas-muted hover:text-canvas-bright rounded-lg">
-                Canvas
-              </Link>
+                    className="block px-4 py-2.5 text-sm text-canvas-muted hover:text-canvas-bright rounded-lg">Canvas</Link>
               <Link to="/marketplace" onClick={() => setMobileOpen(false)}
-                    className="block px-4 py-2.5 text-sm text-canvas-muted hover:text-canvas-bright rounded-lg">
-                Marketplace
-              </Link>
+                    className="block px-4 py-2.5 text-sm text-canvas-muted hover:text-canvas-bright rounded-lg">Marketplace</Link>
               {user ? (
                 <>
                   <Link to="/dashboard" onClick={() => setMobileOpen(false)}
-                        className="block px-4 py-2.5 text-sm text-canvas-muted hover:text-canvas-bright rounded-lg">
-                    Dashboard
-                  </Link>
+                        className="block px-4 py-2.5 text-sm text-canvas-muted hover:text-canvas-bright rounded-lg">Dashboard</Link>
                   <button onClick={() => { handleLogout(); setMobileOpen(false); }}
-                          className="block w-full text-left px-4 py-2.5 text-sm text-red-400 rounded-lg">
-                    Sign Out
-                  </button>
+                          className="block w-full text-left px-4 py-2.5 text-sm text-red-400 rounded-lg">Sign Out</button>
                 </>
               ) : (
                 <Link to="/login" onClick={() => setMobileOpen(false)}
-                      className="block px-4 py-2.5 text-sm text-neon-cyan rounded-lg">
-                  Sign In
-                </Link>
+                      className="block px-4 py-2.5 text-sm text-neon-amber rounded-lg">Sign In</Link>
               )}
             </div>
           </motion.div>

@@ -3,7 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/stores/authStore';
 import { api } from '@/lib/api';
 import { Navbar } from '@/components/layout/Navbar';
-import { Grid3X3 } from 'lucide-react';
+import { Crosshair } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export function LoginPage() {
@@ -39,11 +39,11 @@ export function LoginPage() {
           className="w-full max-w-sm"
         >
           <div className="text-center mb-8">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-neon-cyan to-neon-magenta flex items-center justify-center mx-auto mb-4">
-              <Grid3X3 size={24} className="text-white" />
+            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-500 to-red-600 flex items-center justify-center mx-auto mb-4">
+              <Crosshair size={24} className="text-white" />
             </div>
             <h1 className="font-display font-bold text-2xl text-canvas-bright">Welcome back</h1>
-            <p className="text-canvas-muted text-sm mt-1">Sign in to your PixelCanvas account</p>
+            <p className="text-canvas-muted text-sm mt-1">Sign in to your PixelStake account</p>
           </div>
 
           <form onSubmit={handleSubmit} className="card space-y-4">
@@ -67,7 +67,7 @@ export function LoginPage() {
 
           <p className="text-center text-sm text-canvas-muted mt-6">
             Don't have an account?{' '}
-            <Link to="/register" className="text-neon-cyan hover:underline">Create one</Link>
+            <Link to="/register" className="text-neon-amber hover:underline">Create one</Link>
           </p>
         </motion.div>
       </div>
@@ -109,11 +109,11 @@ export function RegisterPage() {
           className="w-full max-w-sm"
         >
           <div className="text-center mb-8">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-neon-cyan to-neon-magenta flex items-center justify-center mx-auto mb-4">
-              <Grid3X3 size={24} className="text-white" />
+            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-500 to-red-600 flex items-center justify-center mx-auto mb-4">
+              <Crosshair size={24} className="text-white" />
             </div>
             <h1 className="font-display font-bold text-2xl text-canvas-bright">Create Account</h1>
-            <p className="text-canvas-muted text-sm mt-1">Join PixelCanvas and own the grid</p>
+            <p className="text-canvas-muted text-sm mt-1">Join PixelStake and own the grid</p>
           </div>
 
           <form onSubmit={handleSubmit} className="card space-y-4">
@@ -142,7 +142,7 @@ export function RegisterPage() {
 
           <p className="text-center text-sm text-canvas-muted mt-6">
             Already have an account?{' '}
-            <Link to="/login" className="text-neon-cyan hover:underline">Sign in</Link>
+            <Link to="/login" className="text-neon-amber hover:underline">Sign in</Link>
           </p>
         </motion.div>
       </div>
