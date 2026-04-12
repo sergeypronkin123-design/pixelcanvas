@@ -9,12 +9,13 @@ import { ProfilePage } from '@/pages/ProfilePage';
 import { SubscribePage, SubscribeSuccessPage, SubscribeCancelPage } from '@/pages/SubscribePage';
 import { OfferPage, ContactsPage, RefundPage, PrivacyPage } from '@/pages/LegalPages';
 import { AdminPage } from '@/pages/AdminPage';
+import { LeaderboardPage } from '@/pages/LeaderboardPage';
+import { ReferralPage } from '@/pages/ReferralPage';
 import '@/styles/globals.css';
 
 function App() {
   const loadUser = useAuthStore((s) => s.loadUser);
   const loading = useAuthStore((s) => s.loading);
-
   useEffect(() => { loadUser(); }, [loadUser]);
 
   if (loading) {
@@ -36,6 +37,8 @@ function App() {
         <Route path="/subscribe" element={<SubscribePage />} />
         <Route path="/subscribe/success" element={<SubscribeSuccessPage />} />
         <Route path="/subscribe/cancel" element={<SubscribeCancelPage />} />
+        <Route path="/leaderboard" element={<LeaderboardPage />} />
+        <Route path="/referral" element={<ReferralPage />} />
         <Route path="/offer" element={<OfferPage />} />
         <Route path="/contacts" element={<ContactsPage />} />
         <Route path="/refund" element={<RefundPage />} />

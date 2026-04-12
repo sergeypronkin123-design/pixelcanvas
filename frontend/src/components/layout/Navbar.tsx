@@ -1,6 +1,6 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/stores/authStore';
-import { Crosshair, User, LogOut, Crown, Menu, X } from 'lucide-react';
+import { Crosshair, User, LogOut, Crown, Menu, X, Trophy, Share2 } from 'lucide-react';
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -24,11 +24,17 @@ export function Navbar() {
           </Link>
           <div className="hidden md:flex items-center gap-1">
             <Link to="/canvas" className="px-3 py-1.5 text-sm text-canvas-muted hover:text-canvas-bright hover:bg-canvas-elevated rounded-lg transition-all">Battle</Link>
+            <Link to="/leaderboard" className="px-3 py-1.5 text-sm text-canvas-muted hover:text-canvas-bright hover:bg-canvas-elevated rounded-lg transition-all flex items-center gap-1">
+              <Trophy size={13} /> Топ
+            </Link>
             <Link to="/subscribe" className="px-3 py-1.5 text-sm text-orange-400/80 hover:text-orange-400 hover:bg-canvas-elevated rounded-lg transition-all flex items-center gap-1">
               <Crown size={13} /> Pro
             </Link>
             {user ? (
               <>
+                <Link to="/referral" className="px-3 py-1.5 text-sm text-neon-green/80 hover:text-neon-green hover:bg-canvas-elevated rounded-lg transition-all flex items-center gap-1">
+                  <Share2 size={13} /> Друзья
+                </Link>
                 <Link to="/profile" className="px-3 py-1.5 text-sm text-canvas-muted hover:text-canvas-bright hover:bg-canvas-elevated rounded-lg transition-all flex items-center gap-1">
                   <User size={13} /> {user.username}
                 </Link>
@@ -56,9 +62,11 @@ export function Navbar() {
                       className="md:hidden overflow-hidden glass border-t border-canvas-border">
             <div className="px-4 py-2 space-y-1">
               <Link to="/canvas" onClick={() => setOpen(false)} className="block px-3 py-2 text-sm text-canvas-muted rounded-lg">Battle</Link>
+              <Link to="/leaderboard" onClick={() => setOpen(false)} className="block px-3 py-2 text-sm text-canvas-muted rounded-lg">Топ игроков</Link>
               <Link to="/subscribe" onClick={() => setOpen(false)} className="block px-3 py-2 text-sm text-orange-400 rounded-lg">Pro</Link>
               {user ? (
                 <>
+                  <Link to="/referral" onClick={() => setOpen(false)} className="block px-3 py-2 text-sm text-neon-green rounded-lg">Пригласить друзей</Link>
                   <Link to="/profile" onClick={() => setOpen(false)} className="block px-3 py-2 text-sm text-canvas-muted rounded-lg">Профиль</Link>
                   <button onClick={() => { handleLogout(); setOpen(false); }} className="block w-full text-left px-3 py-2 text-sm text-red-400 rounded-lg">Выйти</button>
                 </>

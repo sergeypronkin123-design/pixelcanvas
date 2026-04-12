@@ -13,4 +13,7 @@ class User(Base):
     subscription_until = Column(DateTime(timezone=True), nullable=True)
     last_pixel_at = Column(DateTime(timezone=True), nullable=True)
     pixels_placed_total = Column(Integer, default=0)
+    referral_code = Column(String(20), unique=True, nullable=True, index=True)
+    referred_by = Column(Integer, nullable=True, index=True)
+    bonus_pixels = Column(Integer, default=0)
     created_at = Column(DateTime(timezone=True), server_default=func.now())

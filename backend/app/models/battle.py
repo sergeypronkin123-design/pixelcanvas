@@ -10,7 +10,7 @@ class Battle(Base):
     started_at = Column(DateTime(timezone=True), server_default=func.now())
     ended_at = Column(DateTime(timezone=True), nullable=True)
     is_active = Column(Boolean, default=True)
-    snapshot_url = Column(Text, nullable=True)  # base64 or URL of final canvas
+    snapshot_url = Column(Text, nullable=True)
     total_pixels_placed = Column(Integer, default=0)
     total_participants = Column(Integer, default=0)
 
@@ -44,4 +44,12 @@ class WebhookEvent(Base):
     external_id = Column(String(255), unique=True, nullable=False, index=True)
     processed = Column(Boolean, default=False)
     payload_json = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class Referral(Base):
+    __tablename__ = "referrals"
+    id = Column(Integer, primary_key=True, index=True)
+    referrer_id = Column(Integer, nullable=False, index=True)
+    referred_id = Column(Integer, nullable=False, index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
