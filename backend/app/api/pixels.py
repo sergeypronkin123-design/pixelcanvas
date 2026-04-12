@@ -1,116 +1,166 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from typing import List
+from pydantic import BaseModel, Field
+from datetime import datetime, timezone
 from app.core.database import get_db
 from app.core.security import get_current_user
-from app.models import Block, BlockStatus, PixelData, User
-from app.schemas import PixelUpdate, PixelOut, BlockPixelsOut
+from app.core.config import get_settings
+from app.models import User, Pixel, BattleParticipant, Battle
+from app.services.battle import is_battle_active, get_battle_end_time, get_next_battle_start, get_cooldown_seconds
 from app.services.websocket import manager
 import asyncio
 import logging
 
 logger = logging.getLogger(__name__)
+settings = get_settings()
 router = APIRouter(prefix="/pixels", tags=["pixels"])
 
 
-@router.get("/block/{block_id}", response_model=BlockPixelsOut)
-def get_block_pixels(block_id: int, db: Session = Depends(get_db)):
-    block = db.query(Block).filter(Block.id == block_id).first()
-    if not block:
-        raise HTTPException(404, "Block not found")
+class PlacePixelRequest(BaseModel):
+    x: int = Field(ge=0, lt=1000)
+    y: int = Field(ge=0, lt=1000)
+    color: str = Field(pattern=r"^#[0-9a-fA-F]{6}$")
 
-    pixels = db.query(PixelData).filter(PixelData.block_id == block_id).all()
-    return BlockPixelsOut(
-        block_id=block_id,
-        pixels=[PixelOut.model_validate(p) for p in pixels],
+
+class PixelOut(BaseModel):
+    x: int
+    y: int
+    color: str
+    user_id: int | None
+
+
+class BattleStatus(BaseModel):
+    is_active: bool
+    battle_end: str | None
+    next_battle_start: str | None
+    online_count: int
+    canvas_width: int
+    canvas_height: int
+    free_cooldown: int
+    sub_cooldown: int
+
+
+@router.get("/status", response_model=BattleStatus)
+def get_status():
+    active = is_battle_active()
+    return BattleStatus(
+        is_active=active,
+        battle_end=get_battle_end_time().isoformat() if active else None,
+        next_battle_start=None if active else get_next_battle_start().isoformat(),
+        online_count=manager.online_count,
+        canvas_width=settings.CANVAS_WIDTH,
+        canvas_height=settings.CANVAS_HEIGHT,
+        free_cooldown=settings.FREE_COOLDOWN_SECONDS,
+        sub_cooldown=settings.SUB_COOLDOWN_SECONDS,
     )
 
 
-@router.get("/region")
-def get_region_pixels(
-    x_min: int = 0, y_min: int = 0, x_max: int = 1000, y_max: int = 1000,
+@router.get("/canvas")
+def get_canvas(
+    x_min: int = Query(0, ge=0),
+    y_min: int = Query(0, ge=0),
+    x_max: int = Query(1000),
+    y_max: int = Query(1000),
     db: Session = Depends(get_db),
 ):
-    """Get all pixels in a viewport region for rendering."""
-    blocks = db.query(Block).filter(
-        Block.x >= x_min, Block.y >= y_min,
-        Block.x < x_max, Block.y < y_max,
-        Block.status.in_([BlockStatus.OWNED, BlockStatus.LISTED]),
+    """Get all pixels in viewport."""
+    pixels = db.query(Pixel).filter(
+        Pixel.x >= x_min, Pixel.y >= y_min,
+        Pixel.x < x_max, Pixel.y < y_max,
     ).all()
-
-    block_ids = [b.id for b in blocks]
-    if not block_ids:
-        return {"pixels": []}
-
-    block_map = {b.id: b for b in blocks}
-    pixels = db.query(PixelData).filter(PixelData.block_id.in_(block_ids)).all()
-
-    result = []
-    for p in pixels:
-        b = block_map.get(p.block_id)
-        if b:
-            result.append({
-                "x": b.x + p.local_x,
-                "y": b.y + p.local_y,
-                "color": p.color,
-            })
-
-    return {"pixels": result}
+    return {
+        "pixels": [{"x": p.x, "y": p.y, "color": p.color, "user_id": p.user_id} for p in pixels],
+    }
 
 
-@router.post("/draw")
-def draw_pixels(data: PixelUpdate, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    block = db.query(Block).filter(Block.id == data.block_id).first()
-    if not block:
-        raise HTTPException(404, "Block not found")
-    if block.owner_id != user.id:
-        raise HTTPException(403, "You don't own this block")
-    if block.status not in (BlockStatus.OWNED, BlockStatus.LISTED):
-        raise HTTPException(400, "Block is not in drawable state")
+@router.post("/place")
+def place_pixel(data: PlacePixelRequest, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    # Check battle is active
+    if not is_battle_active():
+        raise HTTPException(400, "Battle is not active. Come back on the 1st!")
 
-    if len(data.pixels) > 100:
-        raise HTTPException(400, "Too many pixels in single request (max 100)")
+    # Check subscription validity
+    is_sub = user.is_subscriber and user.subscription_until and user.subscription_until > datetime.now(timezone.utc)
 
-    updated_pixels = []
-    for px in data.pixels:
-        if px.local_x < 0 or px.local_x >= block.width or px.local_y < 0 or px.local_y >= block.height:
-            continue
+    # Check cooldown
+    cooldown = get_cooldown_seconds(is_sub)
+    now = datetime.now(timezone.utc)
 
-        existing = db.query(PixelData).filter(
-            PixelData.block_id == data.block_id,
-            PixelData.local_x == px.local_x,
-            PixelData.local_y == px.local_y,
-        ).first()
+    if user.last_pixel_at:
+        elapsed = (now - user.last_pixel_at).total_seconds()
+        if elapsed < cooldown:
+            remaining = cooldown - elapsed
+            raise HTTPException(429, f"Wait {remaining:.1f}s before placing another pixel")
 
-        if existing:
-            existing.color = px.color
-        else:
-            new_pixel = PixelData(
-                block_id=data.block_id,
-                local_x=px.local_x,
-                local_y=px.local_y,
-                color=px.color,
-            )
-            db.add(new_pixel)
+    # Validate coordinates
+    if data.x < 0 or data.x >= settings.CANVAS_WIDTH or data.y < 0 or data.y >= settings.CANVAS_HEIGHT:
+        raise HTTPException(400, "Coordinates out of bounds")
 
-        updated_pixels.append({
-            "x": block.x + px.local_x,
-            "y": block.y + px.local_y,
-            "color": px.color,
-        })
+    # Place pixel (upsert)
+    existing = db.query(Pixel).filter(Pixel.x == data.x, Pixel.y == data.y).first()
+    if existing:
+        existing.color = data.color
+        existing.user_id = user.id
+        existing.placed_at = now
+    else:
+        pixel = Pixel(x=data.x, y=data.y, color=data.color, user_id=user.id, placed_at=now)
+        db.add(pixel)
+
+    # Update user
+    user.last_pixel_at = now
+    user.pixels_placed_total = (user.pixels_placed_total or 0) + 1
+
+    # Track participation in current battle
+    current_month = now.month
+    current_year = now.year
+    battle = db.query(Battle).filter(Battle.year == current_year, Battle.month == current_month, Battle.is_active == True).first()
+    if not battle:
+        battle = Battle(year=current_year, month=current_month, is_active=True, total_pixels_placed=0, total_participants=0)
+        db.add(battle)
+        db.flush()
+
+    participant = db.query(BattleParticipant).filter(
+        BattleParticipant.battle_id == battle.id,
+        BattleParticipant.user_id == user.id,
+    ).first()
+    if not participant:
+        participant = BattleParticipant(battle_id=battle.id, user_id=user.id, pixels_placed=0)
+        db.add(participant)
+        battle.total_participants = (battle.total_participants or 0) + 1
+
+    participant.pixels_placed = (participant.pixels_placed or 0) + 1
+    battle.total_pixels_placed = (battle.total_pixels_placed or 0) + 1
 
     db.commit()
 
-    # Broadcast pixel updates
-    if updated_pixels:
-        try:
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                asyncio.ensure_future(manager.broadcast({
-                    "type": "pixel_update",
-                    "pixels": updated_pixels,
-                }))
-        except Exception as e:
-            logger.error(f"Broadcast error: {e}")
+    # Broadcast
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            asyncio.ensure_future(manager.broadcast({
+                "type": "pixel",
+                "x": data.x, "y": data.y,
+                "color": data.color,
+                "user_id": user.id,
+                "username": user.username,
+            }))
+    except Exception as e:
+        logger.error(f"Broadcast error: {e}")
 
-    return {"status": "ok", "updated": len(updated_pixels)}
+    return {
+        "status": "ok",
+        "cooldown": cooldown,
+        "next_pixel_at": (now.timestamp() + cooldown),
+    }
+
+
+@router.get("/cooldown")
+def get_cooldown(user: User = Depends(get_current_user)):
+    is_sub = user.is_subscriber and user.subscription_until and user.subscription_until > datetime.now(timezone.utc)
+    cooldown = get_cooldown_seconds(is_sub)
+    now = datetime.now(timezone.utc)
+    remaining = 0
+    if user.last_pixel_at:
+        elapsed = (now - user.last_pixel_at).total_seconds()
+        remaining = max(0, cooldown - elapsed)
+    return {"cooldown": cooldown, "remaining": remaining, "is_subscriber": is_sub}

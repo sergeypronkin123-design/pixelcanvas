@@ -1,87 +1,98 @@
 import { useRef, useEffect, useCallback, useState } from 'react';
-import { useCanvasStore } from '@/stores/canvasStore';
-import { useAuthStore } from '@/stores/authStore';
 import { api } from '@/lib/api';
-import type { BlockBulk } from '@/types';
+import { useAuthStore } from '@/stores/authStore';
 
-const COLORS: Record<string, string> = {
-  free: '#1a1a28',
-  reserved: '#3d2a1a',
-  owned: '#1a2a1a',
-  listed: '#1a1a3d',
-};
-
-const BORDER_COLORS: Record<string, string> = {
-  free: '#2a2a3d',
-  reserved: '#ffaa00',
-  owned: '#00ff88',
-  listed: '#8b5cf6',
-};
+const PALETTE = [
+  '#FF0000', '#FF4500', '#FF8C00', '#FFD700', '#FFFF00',
+  '#7CFC00', '#00FF00', '#00FA9A', '#00FFFF', '#00BFFF',
+  '#0000FF', '#4B0082', '#8B00FF', '#FF00FF', '#FF1493',
+  '#FFFFFF', '#C0C0C0', '#808080', '#404040', '#000000',
+  '#8B4513', '#D2691E', '#F4A460', '#FFE4C4', '#FFC0CB',
+];
 
 interface CanvasRendererProps {
-  onBlockClick: (block: BlockBulk) => void;
+  battleActive: boolean;
+  onPixelPlaced: () => void;
+  pixelUpdates: { x: number; y: number; color: string }[];
 }
 
-export function CanvasRenderer({ onBlockClick }: CanvasRendererProps) {
+export function CanvasRenderer({ battleActive, onPixelPlaced, pixelUpdates }: CanvasRendererProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const user = useAuthStore((s) => s.user);
 
-  const [viewport, setViewport] = useState({ x: 0, y: 0, scale: 4 });
+  const [viewport, setViewport] = useState({ x: 0, y: 0, scale: 1 });
+  const [selectedColor, setSelectedColor] = useState('#FF0000');
+  const [cooldownRemaining, setCooldownRemaining] = useState(0);
+  const [hoverPos, setHoverPos] = useState<{ x: number; y: number } | null>(null);
+
+  const pixelsRef = useRef<Map<string, string>>(new Map());
+  const viewportRef = useRef(viewport);
   const isDraggingRef = useRef(false);
   const dragStartRef = useRef({ x: 0, y: 0, vx: 0, vy: 0 });
   const hasDraggedRef = useRef(false);
-  const [hoverBlock, setHoverBlock] = useState<{ x: number; y: number } | null>(null);
-  const drawBufferRef = useRef<{ local_x: number; local_y: number; color: string }[]>([]);
-  const drawBlockRef = useRef<number | null>(null);
-  const flushTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
   const animRef = useRef<number>();
-  const lastLoadRef = useRef<string>('');
-  const viewportRef = useRef(viewport);
+  const lastLoadRef = useRef('');
+
   viewportRef.current = viewport;
 
-  const config = useCanvasStore((s) => s.config);
-  const tool = useCanvasStore((s) => s.tool);
-  const drawColor = useCanvasStore((s) => s.drawColor);
+  // Apply websocket pixel updates
+  useEffect(() => {
+    for (const p of pixelUpdates) {
+      pixelsRef.current.set(`${p.x},${p.y}`, p.color);
+    }
+  }, [pixelUpdates]);
 
-  const blockSize = config?.block_size || 10;
-  const canvasWidth = config?.canvas_width || 1000;
-  const canvasHeight = config?.canvas_height || 1000;
-
-  // Load ONLY visible blocks for current viewport
+  // Load pixels for viewport
   const loadViewport = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const vp = viewportRef.current;
     const rect = canvas.getBoundingClientRect();
 
-    const xMin = Math.max(0, Math.floor(-vp.x / vp.scale / blockSize) * blockSize - blockSize);
-    const yMin = Math.max(0, Math.floor(-vp.y / vp.scale / blockSize) * blockSize - blockSize);
-    const xMax = Math.min(canvasWidth, Math.ceil((rect.width - vp.x) / vp.scale / blockSize) * blockSize + blockSize * 2);
-    const yMax = Math.min(canvasHeight, Math.ceil((rect.height - vp.y) / vp.scale / blockSize) * blockSize + blockSize * 2);
+    const xMin = Math.max(0, Math.floor(-vp.x / vp.scale) - 10);
+    const yMin = Math.max(0, Math.floor(-vp.y / vp.scale) - 10);
+    const xMax = Math.min(1000, Math.ceil((rect.width - vp.x) / vp.scale) + 10);
+    const yMax = Math.min(1000, Math.ceil((rect.height - vp.y) / vp.scale) + 10);
 
     const key = `${xMin},${yMin},${xMax},${yMax}`;
     if (key === lastLoadRef.current) return;
     lastLoadRef.current = key;
 
-    const store = useCanvasStore.getState();
-    store.loadCanvas(xMin, yMin, xMax, yMax);
-    store.loadPixels(xMin, yMin, xMax, yMax);
-  }, [blockSize, canvasWidth, canvasHeight]);
+    api.getCanvas(xMin, yMin, xMax, yMax).then((data) => {
+      for (const p of data.pixels) {
+        pixelsRef.current.set(`${p.x},${p.y}`, p.color);
+      }
+    }).catch(() => {});
+  }, []);
 
-  // Debounced load on viewport change
   const loadTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
   useEffect(() => {
     if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
-    loadTimeoutRef.current = setTimeout(loadViewport, 100);
+    loadTimeoutRef.current = setTimeout(loadViewport, 150);
   }, [viewport, loadViewport]);
 
-  // Initial load
   useEffect(() => { loadViewport(); }, [loadViewport]);
 
-  // Render loop - only draws visible blocks
+  // Cooldown timer
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCooldownRemaining((prev) => Math.max(0, prev - 0.1));
+    }, 100);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Fetch initial cooldown
+  useEffect(() => {
+    if (user) {
+      api.getCooldown().then((data) => {
+        setCooldownRemaining(data.remaining);
+      }).catch(() => {});
+    }
+  }, [user]);
+
+  // Render loop
   useEffect(() => {
     let running = true;
-
     const render = () => {
       if (!running) return;
       const canvas = canvasRef.current;
@@ -91,170 +102,118 @@ export function CanvasRenderer({ onBlockClick }: CanvasRendererProps) {
 
       const rect = canvas.getBoundingClientRect();
       const dpr = window.devicePixelRatio || 1;
-
       if (canvas.width !== Math.floor(rect.width * dpr) || canvas.height !== Math.floor(rect.height * dpr)) {
         canvas.width = Math.floor(rect.width * dpr);
         canvas.height = Math.floor(rect.height * dpr);
       }
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-
       const vp = viewportRef.current;
 
-      ctx.fillStyle = '#0a0a0f';
+      // Background
+      ctx.fillStyle = '#111118';
       ctx.fillRect(0, 0, rect.width, rect.height);
 
       ctx.save();
       ctx.translate(vp.x, vp.y);
       ctx.scale(vp.scale, vp.scale);
 
-      // Calculate visible range only
-      const xMin = Math.max(0, Math.floor(-vp.x / vp.scale / blockSize) * blockSize);
-      const yMin = Math.max(0, Math.floor(-vp.y / vp.scale / blockSize) * blockSize);
-      const xMax = Math.min(canvasWidth, xMin + Math.ceil(rect.width / vp.scale / blockSize) * blockSize + blockSize * 2);
-      const yMax = Math.min(canvasHeight, yMin + Math.ceil(rect.height / vp.scale / blockSize) * blockSize + blockSize * 2);
+      // Canvas boundary
+      ctx.fillStyle = '#1a1a24';
+      ctx.fillRect(0, 0, 1000, 1000);
 
-      const currentBlocks = useCanvasStore.getState().blocks;
-      const currentPixels = useCanvasStore.getState().pixels;
-      const currentSelected = useCanvasStore.getState().selectedBlock;
+      // Grid lines when zoomed
+      if (vp.scale >= 4) {
+        ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+        ctx.lineWidth = 0.5 / vp.scale;
+        for (let i = 0; i <= 1000; i++) {
+          ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, 1000); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(1000, i); ctx.stroke();
+        }
+      }
 
-      const showPixels = vp.scale >= 2;
-      const showGrid = vp.scale >= 1;
+      // Draw pixels
+      const pixels = pixelsRef.current;
+      const xMin = Math.max(0, Math.floor(-vp.x / vp.scale));
+      const yMin = Math.max(0, Math.floor(-vp.y / vp.scale));
+      const xMax = Math.min(1000, Math.ceil((rect.width - vp.x) / vp.scale));
+      const yMax = Math.min(1000, Math.ceil((rect.height - vp.y) / vp.scale));
 
-      // Draw only visible blocks
-      for (let bx = xMin; bx < xMax; bx += blockSize) {
-        for (let by = yMin; by < yMax; by += blockSize) {
-          const block = currentBlocks.get(`${bx},${by}`);
-          const status = block?.status || 'free';
-
-          ctx.fillStyle = COLORS[status] || COLORS.free;
-          ctx.fillRect(bx, by, blockSize, blockSize);
-
-          // Only draw individual pixels when zoomed in enough
-          if (showPixels) {
-            for (let px = 0; px < blockSize; px++) {
-              for (let py = 0; py < blockSize; py++) {
-                const color = currentPixels.get(`${bx + px},${by + py}`);
-                if (color && color !== '#000000') {
-                  ctx.fillStyle = color;
-                  ctx.fillRect(bx + px, by + py, 1, 1);
-                }
-              }
-            }
-          }
-
-          // Grid lines only when zoomed in
-          if (showGrid) {
-            ctx.strokeStyle = BORDER_COLORS[status] || BORDER_COLORS.free;
-            ctx.lineWidth = 0.3 / vp.scale;
-            ctx.strokeRect(bx, by, blockSize, blockSize);
+      for (let x = xMin; x < xMax; x++) {
+        for (let y = yMin; y < yMax; y++) {
+          const color = pixels.get(`${x},${y}`);
+          if (color) {
+            ctx.fillStyle = color;
+            ctx.fillRect(x, y, 1, 1);
           }
         }
       }
 
-      // Hover
-      if (hoverBlock) {
-        ctx.strokeStyle = '#00f0ff';
+      // Hover pixel highlight
+      if (hoverPos && vp.scale >= 2) {
+        ctx.strokeStyle = '#ffffff';
         ctx.lineWidth = 2 / vp.scale;
-        ctx.shadowColor = '#00f0ff';
-        ctx.shadowBlur = 6 / vp.scale;
-        ctx.strokeRect(hoverBlock.x, hoverBlock.y, blockSize, blockSize);
-        ctx.shadowBlur = 0;
-      }
+        ctx.strokeRect(hoverPos.x, hoverPos.y, 1, 1);
 
-      // Selected
-      if (currentSelected) {
-        ctx.strokeStyle = '#ff00aa';
-        ctx.lineWidth = 2.5 / vp.scale;
-        ctx.setLineDash([4 / vp.scale, 4 / vp.scale]);
-        ctx.strokeRect(currentSelected.x, currentSelected.y, currentSelected.width, currentSelected.height);
-        ctx.setLineDash([]);
+        // Preview color
+        ctx.fillStyle = selectedColor;
+        ctx.globalAlpha = 0.5;
+        ctx.fillRect(hoverPos.x, hoverPos.y, 1, 1);
+        ctx.globalAlpha = 1;
       }
 
       ctx.restore();
 
-      // HUD
+      // HUD bottom-left
       ctx.fillStyle = 'rgba(0,0,0,0.7)';
-      ctx.fillRect(8, rect.height - 34, 240, 26);
+      ctx.fillRect(8, rect.height - 30, 200, 22);
       ctx.fillStyle = '#6b6b8a';
-      ctx.font = '12px JetBrains Mono, monospace';
-      const wx = Math.floor(-vp.x / vp.scale);
-      const wy = Math.floor(-vp.y / vp.scale);
-      ctx.fillText(`pos: ${wx},${wy}  zoom: ${vp.scale.toFixed(1)}x  [scroll to zoom]`, 14, rect.height - 16);
+      ctx.font = '11px JetBrains Mono, monospace';
+      const wx = hoverPos ? hoverPos.x : Math.floor(-vp.x / vp.scale);
+      const wy = hoverPos ? hoverPos.y : Math.floor(-vp.y / vp.scale);
+      ctx.fillText(`${wx}, ${wy}  zoom: ${vp.scale.toFixed(1)}x`, 14, rect.height - 14);
 
       animRef.current = requestAnimationFrame(render);
     };
-
     animRef.current = requestAnimationFrame(render);
     return () => { running = false; if (animRef.current) cancelAnimationFrame(animRef.current); };
-  }, [hoverBlock, blockSize, canvasWidth, canvasHeight]);
+  }, [hoverPos, selectedColor]);
 
-  // Center viewport on mount
+  // Center on mount
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
-    const scale = 4;
-    setViewport({
-      x: rect.width / 2 - (canvasWidth * scale) / 2,
-      y: rect.height / 2 - (canvasHeight * scale) / 2,
-      scale,
-    });
-  }, [canvasWidth, canvasHeight]);
+    setViewport({ x: rect.width / 2 - 500, y: rect.height / 2 - 500, scale: 1 });
+  }, []);
 
   const screenToWorld = useCallback((sx: number, sy: number) => {
     const vp = viewportRef.current;
-    return { x: (sx - vp.x) / vp.scale, y: (sy - vp.y) / vp.scale };
+    return { x: Math.floor((sx - vp.x) / vp.scale), y: Math.floor((sy - vp.y) / vp.scale) };
   }, []);
 
-  const flushDrawBuffer = useCallback(() => {
-    const blockId = drawBlockRef.current;
-    const buffer = drawBufferRef.current;
-    if (blockId && buffer.length > 0) {
-      api.drawPixels(blockId, [...buffer]).catch(console.error);
-      drawBufferRef.current = [];
+  // Place pixel on click
+  const handlePlace = useCallback(async (wx: number, wy: number) => {
+    if (!user || !battleActive || cooldownRemaining > 0) return;
+    if (wx < 0 || wx >= 1000 || wy < 0 || wy >= 1000) return;
+    try {
+      const res = await api.placePixel(wx, wy, selectedColor);
+      pixelsRef.current.set(`${wx},${wy}`, selectedColor);
+      setCooldownRemaining(res.cooldown);
+      onPixelPlaced();
+    } catch (e: any) {
+      if (e.message.includes('Wait')) {
+        const match = e.message.match(/([\d.]+)s/);
+        if (match) setCooldownRemaining(parseFloat(match[1]));
+      }
     }
-  }, []);
-
-  const handleDraw = useCallback((wx: number, wy: number) => {
-    const bx = Math.floor(wx / blockSize) * blockSize;
-    const by = Math.floor(wy / blockSize) * blockSize;
-    const block = useCanvasStore.getState().blocks.get(`${bx},${by}`);
-    if (!block || block.owner_id !== user?.id) return;
-
-    const localX = Math.floor(wx) - bx;
-    const localY = Math.floor(wy) - by;
-    if (localX < 0 || localX >= blockSize || localY < 0 || localY >= blockSize) return;
-
-    const color = tool === 'eraser' ? '#000000' : drawColor;
-    useCanvasStore.getState().updatePixels([{ x: bx + localX, y: by + localY, color }]);
-
-    drawBlockRef.current = block.id;
-    drawBufferRef.current.push({ local_x: localX, local_y: localY, color });
-
-    if (flushTimeoutRef.current) clearTimeout(flushTimeoutRef.current);
-    if (drawBufferRef.current.length >= 20) {
-      flushDrawBuffer();
-    } else {
-      flushTimeoutRef.current = setTimeout(flushDrawBuffer, 200);
-    }
-  }, [blockSize, user, tool, drawColor, flushDrawBuffer]);
+  }, [user, battleActive, cooldownRemaining, selectedColor, onPixelPlaced]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    const rect = canvasRef.current?.getBoundingClientRect();
-    if (!rect) return;
-
     isDraggingRef.current = true;
     hasDraggedRef.current = false;
     const vp = viewportRef.current;
     dragStartRef.current = { x: e.clientX, y: e.clientY, vx: vp.x, vy: vp.y };
-
-    if ((tool === 'pencil' || tool === 'eraser') && user) {
-      const sx = e.clientX - rect.left;
-      const sy = e.clientY - rect.top;
-      const world = screenToWorld(sx, sy);
-      handleDraw(world.x, world.y);
-    }
-  }, [tool, user, screenToWorld, handleDraw]);
+  }, []);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     const rect = canvasRef.current?.getBoundingClientRect();
@@ -262,7 +221,7 @@ export function CanvasRenderer({ onBlockClick }: CanvasRendererProps) {
     const sx = e.clientX - rect.left;
     const sy = e.clientY - rect.top;
 
-    if (isDraggingRef.current && (tool === 'select' || !user)) {
+    if (isDraggingRef.current) {
       const dx = e.clientX - dragStartRef.current.x;
       const dy = e.clientY - dragStartRef.current.y;
       if (Math.abs(dx) > 3 || Math.abs(dy) > 3) hasDraggedRef.current = true;
@@ -270,46 +229,24 @@ export function CanvasRenderer({ onBlockClick }: CanvasRendererProps) {
       return;
     }
 
-    if (isDraggingRef.current && (tool === 'pencil' || tool === 'eraser') && user) {
-      hasDraggedRef.current = true;
-      const world = screenToWorld(sx, sy);
-      handleDraw(world.x, world.y);
-      return;
-    }
-
     const world = screenToWorld(sx, sy);
-    const bx = Math.floor(world.x / blockSize) * blockSize;
-    const by = Math.floor(world.y / blockSize) * blockSize;
-    if (bx >= 0 && by >= 0 && bx < canvasWidth && by < canvasHeight) {
-      setHoverBlock({ x: bx, y: by });
+    if (world.x >= 0 && world.x < 1000 && world.y >= 0 && world.y < 1000) {
+      setHoverPos(world);
     } else {
-      setHoverBlock(null);
+      setHoverPos(null);
     }
-  }, [tool, user, screenToWorld, blockSize, canvasWidth, canvasHeight, handleDraw]);
+  }, [screenToWorld]);
 
   const handleMouseUp = useCallback((e: React.MouseEvent) => {
-    const wasDragging = hasDraggedRef.current;
+    const wasDrag = hasDraggedRef.current;
     isDraggingRef.current = false;
-
-    if (!wasDragging) {
+    if (!wasDrag) {
       const rect = canvasRef.current?.getBoundingClientRect();
       if (!rect) return;
-      const sx = e.clientX - rect.left;
-      const sy = e.clientY - rect.top;
-      const world = screenToWorld(sx, sy);
-      const bx = Math.floor(world.x / blockSize) * blockSize;
-      const by = Math.floor(world.y / blockSize) * blockSize;
-      const block = useCanvasStore.getState().blocks.get(`${bx},${by}`);
-      if (block) {
-        api.getBlock(block.id).then((detail) => {
-          useCanvasStore.getState().selectBlock(detail);
-          onBlockClick(block);
-        }).catch(console.error);
-      }
+      const world = screenToWorld(e.clientX - rect.left, e.clientY - rect.top);
+      handlePlace(world.x, world.y);
     }
-
-    flushDrawBuffer();
-  }, [screenToWorld, blockSize, onBlockClick, flushDrawBuffer]);
+  }, [screenToWorld, handlePlace]);
 
   const handleWheel = useCallback((e: React.WheelEvent) => {
     e.preventDefault();
@@ -318,28 +255,64 @@ export function CanvasRenderer({ onBlockClick }: CanvasRendererProps) {
     const sx = e.clientX - rect.left;
     const sy = e.clientY - rect.top;
     const vp = viewportRef.current;
-
-    const zoomFactor = e.deltaY < 0 ? 1.15 : 0.87;
-    const newScale = Math.min(Math.max(vp.scale * zoomFactor, 0.3), 30);
-
+    const factor = e.deltaY < 0 ? 1.15 : 0.87;
+    const newScale = Math.min(Math.max(vp.scale * factor, 0.3), 40);
     const wx = (sx - vp.x) / vp.scale;
     const wy = (sy - vp.y) / vp.scale;
-
     setViewport({ scale: newScale, x: sx - wx * newScale, y: sy - wy * newScale });
   }, []);
+
+  const cooldownPct = user
+    ? Math.min(100, (cooldownRemaining / (user.is_subscriber ? 5 : 30)) * 100)
+    : 0;
 
   return (
     <div className="w-full h-full relative">
       <canvas
         ref={canvasRef}
-        className="w-full h-full"
-        style={{ cursor: tool === 'select' ? 'grab' : 'crosshair', touchAction: 'none' }}
+        className="w-full h-full cursor-crosshair"
+        style={{ touchAction: 'none' }}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
-        onMouseLeave={() => { isDraggingRef.current = false; setHoverBlock(null); flushDrawBuffer(); }}
+        onMouseLeave={() => { isDraggingRef.current = false; setHoverPos(null); }}
         onWheel={handleWheel}
       />
+
+      {/* Color palette */}
+      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-30 glass rounded-2xl px-3 py-2 flex items-center gap-2">
+        <div className="flex flex-wrap gap-1 max-w-[320px]">
+          {PALETTE.map((c) => (
+            <button key={c} onClick={() => setSelectedColor(c)}
+              className={`w-6 h-6 rounded border-2 transition-all hover:scale-110 ${selectedColor === c ? 'border-white scale-110 shadow-[0_0_8px_rgba(255,255,255,0.4)]' : 'border-transparent'}`}
+              style={{ backgroundColor: c }}
+            />
+          ))}
+        </div>
+        <div className="pl-2 border-l border-canvas-border">
+          <label className="relative cursor-pointer">
+            <div className="w-7 h-7 rounded-lg border-2 border-canvas-border" style={{ backgroundColor: selectedColor }} />
+            <input type="color" value={selectedColor} onChange={(e) => setSelectedColor(e.target.value)}
+                   className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+          </label>
+        </div>
+
+        {/* Cooldown indicator */}
+        {user && (
+          <div className="pl-2 border-l border-canvas-border flex items-center gap-2 min-w-[80px]">
+            {cooldownRemaining > 0 ? (
+              <div className="flex items-center gap-1.5">
+                <div className="w-16 h-2 bg-canvas-bg rounded-full overflow-hidden">
+                  <div className="h-full bg-orange-500 rounded-full transition-all" style={{ width: `${100 - cooldownPct}%` }} />
+                </div>
+                <span className="text-xs font-mono text-orange-400">{cooldownRemaining.toFixed(1)}s</span>
+              </div>
+            ) : (
+              <span className="text-xs font-mono text-neon-green">Ready!</span>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

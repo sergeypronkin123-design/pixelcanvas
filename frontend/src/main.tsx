@@ -5,10 +5,8 @@ import { useAuthStore } from '@/stores/authStore';
 import { LandingPage } from '@/pages/LandingPage';
 import { LoginPage, RegisterPage } from '@/pages/AuthPages';
 import { CanvasPage } from '@/pages/CanvasPage';
-import { DashboardPage } from '@/pages/DashboardPage';
-import { MarketplacePage } from '@/pages/MarketplacePage';
-import { PurchaseSuccessPage, PurchaseCancelPage } from '@/pages/PurchasePages';
-import { AdminPage } from '@/pages/AdminPage';
+import { ProfilePage } from '@/pages/ProfilePage';
+import { SubscribePage, SubscribeSuccessPage, SubscribeCancelPage } from '@/pages/SubscribePage';
 import { OfferPage, ContactsPage, RefundPage, PrivacyPage } from '@/pages/LegalPages';
 import '@/styles/globals.css';
 
@@ -16,14 +14,12 @@ function App() {
   const loadUser = useAuthStore((s) => s.loadUser);
   const loading = useAuthStore((s) => s.loading);
 
-  useEffect(() => {
-    loadUser();
-  }, [loadUser]);
+  useEffect(() => { loadUser(); }, [loadUser]);
 
   if (loading) {
     return (
       <div className="min-h-screen bg-canvas-bg flex items-center justify-center">
-        <div className="w-10 h-10 border-2 border-neon-cyan/30 border-t-neon-cyan rounded-full animate-spin" />
+        <div className="w-10 h-10 border-2 border-orange-500/30 border-t-orange-500 rounded-full animate-spin" />
       </div>
     );
   }
@@ -35,11 +31,10 @@ function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/canvas" element={<CanvasPage />} />
-        <Route path="/dashboard" element={<DashboardPage />} />
-        <Route path="/marketplace" element={<MarketplacePage />} />
-        <Route path="/purchase/success" element={<PurchaseSuccessPage />} />
-        <Route path="/purchase/cancel" element={<PurchaseCancelPage />} />
-        <Route path="/admin" element={<AdminPage />} />
+        <Route path="/profile" element={<ProfilePage />} />
+        <Route path="/subscribe" element={<SubscribePage />} />
+        <Route path="/subscribe/success" element={<SubscribeSuccessPage />} />
+        <Route path="/subscribe/cancel" element={<SubscribeCancelPage />} />
         <Route path="/offer" element={<OfferPage />} />
         <Route path="/contacts" element={<ContactsPage />} />
         <Route path="/refund" element={<RefundPage />} />
@@ -50,7 +45,5 @@ function App() {
 }
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>,
+  <React.StrictMode><App /></React.StrictMode>,
 );

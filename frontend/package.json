@@ -1,7 +1,7 @@
 {
-  "name": "pixelcanvas-frontend",
+  "name": "pixelstake-frontend",
   "private": true,
-  "version": "1.0.0",
+  "version": "2.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -9,7 +9,6 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@stripe/stripe-js": "^4.1.0",
     "framer-motion": "^11.2.10",
     "lucide-react": "^0.395.0",
     "react": "^18.3.1",

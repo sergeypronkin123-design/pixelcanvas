@@ -1,12 +1,15 @@
-import { useEffect, useRef } from 'react';
-import { useCanvasStore } from '@/stores/canvasStore';
-import type { WSMessage } from '@/types';
+import { useEffect, useRef, useCallback } from 'react';
 
-export function useWebSocket() {
+interface WSMessage {
+  type: string;
+  [key: string]: any;
+}
+
+export function useWebSocket(onMessage: (msg: WSMessage) => void) {
   const wsRef = useRef<WebSocket | null>(null);
-  const updateBlock = useCanvasStore((s) => s.updateBlock);
-  const updatePixels = useCanvasStore((s) => s.updatePixels);
-  const reconnectTimeout = useRef<ReturnType<typeof setTimeout>>();
+  const reconnectRef = useRef<ReturnType<typeof setTimeout>>();
+  const onMessageRef = useRef(onMessage);
+  onMessageRef.current = onMessage;
 
   useEffect(() => {
     function connect() {
@@ -15,47 +18,29 @@ export function useWebSocket() {
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
 
-      ws.onopen = () => {
-        console.log('WebSocket connected');
-      };
-
       ws.onmessage = (event) => {
         try {
-          const msg: WSMessage = JSON.parse(event.data);
-          if (msg.type === 'block_update' && msg.block) {
-            updateBlock(msg.block);
-          } else if (msg.type === 'pixel_update' && msg.pixels) {
-            updatePixels(msg.pixels);
-          }
-        } catch (e) {
-          console.error('WS parse error', e);
-        }
+          const msg = JSON.parse(event.data);
+          onMessageRef.current(msg);
+        } catch {}
       };
 
       ws.onclose = () => {
-        console.log('WebSocket disconnected, reconnecting...');
-        reconnectTimeout.current = setTimeout(connect, 3000);
+        reconnectRef.current = setTimeout(connect, 3000);
       };
+      ws.onerror = () => ws.close();
 
-      ws.onerror = () => {
-        ws.close();
-      };
-
-      // Keep alive
       const ping = setInterval(() => {
-        if (ws.readyState === WebSocket.OPEN) {
-          ws.send('ping');
-        }
+        if (ws.readyState === WebSocket.OPEN) ws.send('ping');
       }, 30000);
 
       return () => clearInterval(ping);
     }
 
     connect();
-
     return () => {
-      if (reconnectTimeout.current) clearTimeout(reconnectTimeout.current);
+      if (reconnectRef.current) clearTimeout(reconnectRef.current);
       wsRef.current?.close();
     };
-  }, [updateBlock, updatePixels]);
+  }, []);
 }

@@ -1,6 +1,6 @@
 import json
 import asyncio
-from typing import Dict, Set
+from typing import Set
 from fastapi import WebSocket
 import logging
 
@@ -12,16 +12,21 @@ class ConnectionManager:
         self.active_connections: Set[WebSocket] = set()
         self._lock = asyncio.Lock()
 
+    @property
+    def online_count(self) -> int:
+        return len(self.active_connections)
+
     async def connect(self, websocket: WebSocket):
         await websocket.accept()
         async with self._lock:
             self.active_connections.add(websocket)
-        logger.info(f"Client connected. Total: {len(self.active_connections)}")
+        # Broadcast new online count
+        await self.broadcast({"type": "online_count", "count": self.online_count})
 
     async def disconnect(self, websocket: WebSocket):
         async with self._lock:
             self.active_connections.discard(websocket)
-        logger.info(f"Client disconnected. Total: {len(self.active_connections)}")
+        await self.broadcast({"type": "online_count", "count": self.online_count})
 
     async def broadcast(self, message: dict):
         data = json.dumps(message)
