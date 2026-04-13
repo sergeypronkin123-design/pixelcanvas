@@ -1,9 +1,9 @@
-import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuthStore } from '@/stores/authStore';
 import { api } from '@/lib/api';
 import { Navbar } from '@/components/layout/Navbar';
-import { Crosshair } from 'lucide-react';
+import { Crosshair, Gift } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export function LoginPage() {
@@ -55,16 +55,24 @@ export function RegisterPage() {
   const [loading, setLoading] = useState(false);
   const { setAuth } = useAuthStore();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
-  // Get ref code from URL
-  const searchParams = new URLSearchParams(window.location.search);
-  const refCode = searchParams.get('ref') || undefined;
+  // Get ref from URL or localStorage (persists across navigation)
+  const urlRef = searchParams.get('ref');
+  const [refCode] = useState(() => {
+    if (urlRef) {
+      localStorage.setItem('pixelstake_ref', urlRef);
+      return urlRef;
+    }
+    return localStorage.getItem('pixelstake_ref') || undefined;
+  });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault(); setLoading(true); setError('');
     try {
       const res = await api.register(email, username, password, refCode);
       setAuth(res.user, res.access_token);
+      localStorage.removeItem('pixelstake_ref'); // Clean up after successful registration
       navigate('/canvas');
     } catch (err: any) { setError(err.message); } finally { setLoading(false); }
   };
@@ -80,11 +88,19 @@ export function RegisterPage() {
             <h1 className="font-display font-bold text-2xl text-canvas-bright">Регистрация</h1>
             <p className="text-canvas-muted text-sm mt-1">Присоединяйся к битве</p>
           </div>
+
+          {refCode && (
+            <div className="mb-4 px-4 py-2.5 bg-neon-green/5 border border-neon-green/20 rounded-xl flex items-center gap-2">
+              <Gift size={16} className="text-neon-green flex-shrink-0" />
+              <p className="text-xs text-neon-green">Тебя пригласил друг! После регистрации он получит бонусные пиксели</p>
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className="card space-y-4">
             {error && <div className="text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-xl px-3 py-2">{error}</div>}
-            <div><label className="label-text">Имя пользователя</label><input type="text" value={username} onChange={(e) => setUsername(e.target.value)} className="input-field" required minLength={3} maxLength={30} /></div>
+            <div><label className="label-text">Имя пользователя</label><input type="text" value={username} onChange={(e) => setUsername(e.target.value)} className="input-field" placeholder="латиница и цифры" required minLength={3} maxLength={30} /></div>
             <div><label className="label-text">Email</label><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="input-field" required /></div>
-            <div><label className="label-text">Пароль</label><input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="input-field" required minLength={6} /></div>
+            <div><label className="label-text">Пароль</label><input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="input-field" placeholder="минимум 6 символов" required minLength={6} /></div>
             <button type="submit" disabled={loading} className="btn-primary w-full">{loading ? 'Создаём...' : 'Создать аккаунт'}</button>
           </form>
           <p className="text-center text-sm text-canvas-muted mt-6">Уже есть аккаунт? <Link to="/login" className="text-orange-400 hover:underline">Войти</Link></p>

@@ -22,13 +22,6 @@ class PlacePixelRequest(BaseModel):
     color: str = Field(pattern=r"^#[0-9a-fA-F]{6}$")
 
 
-class PixelOut(BaseModel):
-    x: int
-    y: int
-    color: str
-    user_id: int | None
-
-
 class BattleStatus(BaseModel):
     is_active: bool
     battle_end: str | None
@@ -63,7 +56,6 @@ def get_canvas(
     y_max: int = Query(1000),
     db: Session = Depends(get_db),
 ):
-    """Get all pixels in viewport."""
     pixels = db.query(Pixel).filter(
         Pixel.x >= x_min, Pixel.y >= y_min,
         Pixel.x < x_max, Pixel.y < y_max,
@@ -75,28 +67,30 @@ def get_canvas(
 
 @router.post("/place")
 def place_pixel(data: PlacePixelRequest, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    # Check battle is active
     if not is_battle_active():
-        raise HTTPException(400, "Battle is not active. Come back on the 1st!")
+        raise HTTPException(400, "Батл не активен. Приходи 1 числа!")
 
-    # Check subscription validity
     is_sub = user.is_subscriber and user.subscription_until and user.subscription_until > datetime.now(timezone.utc)
-
-    # Check cooldown
-    cooldown = get_cooldown_seconds(is_sub)
     now = datetime.now(timezone.utc)
 
-    if user.last_pixel_at:
-        elapsed = (now - user.last_pixel_at).total_seconds()
-        if elapsed < cooldown:
-            remaining = cooldown - elapsed
-            raise HTTPException(429, f"Wait {remaining:.1f}s before placing another pixel")
+    # Check if user has bonus pixels (skip cooldown if yes)
+    using_bonus = False
+    if (user.bonus_pixels or 0) > 0:
+        # Has bonus pixels — skip cooldown, use one bonus
+        using_bonus = True
+    else:
+        # Normal cooldown check
+        cooldown = get_cooldown_seconds(is_sub)
+        if user.last_pixel_at:
+            elapsed = (now - user.last_pixel_at).total_seconds()
+            if elapsed < cooldown:
+                remaining = cooldown - elapsed
+                raise HTTPException(429, f"Подожди {remaining:.1f}с")
 
-    # Validate coordinates
     if data.x < 0 or data.x >= settings.CANVAS_WIDTH or data.y < 0 or data.y >= settings.CANVAS_HEIGHT:
-        raise HTTPException(400, "Coordinates out of bounds")
+        raise HTTPException(400, "Координаты за пределами холста")
 
-    # Place pixel (upsert)
+    # Place pixel
     existing = db.query(Pixel).filter(Pixel.x == data.x, Pixel.y == data.y).first()
     if existing:
         existing.color = data.color
@@ -110,7 +104,11 @@ def place_pixel(data: PlacePixelRequest, user: User = Depends(get_current_user),
     user.last_pixel_at = now
     user.pixels_placed_total = (user.pixels_placed_total or 0) + 1
 
-    # Track participation in current battle
+    # Spend bonus pixel if used
+    if using_bonus:
+        user.bonus_pixels = (user.bonus_pixels or 0) - 1
+
+    # Track battle participation
     current_month = now.month
     current_year = now.year
     battle = db.query(Battle).filter(Battle.year == current_year, Battle.month == current_month, Battle.is_active == True).first()
@@ -147,10 +145,14 @@ def place_pixel(data: PlacePixelRequest, user: User = Depends(get_current_user),
     except Exception as e:
         logger.error(f"Broadcast error: {e}")
 
+    cooldown = 0 if (user.bonus_pixels or 0) > 0 else get_cooldown_seconds(is_sub)
+
     return {
         "status": "ok",
         "cooldown": cooldown,
-        "next_pixel_at": (now.timestamp() + cooldown),
+        "next_pixel_at": now.timestamp() + cooldown,
+        "bonus_pixels_remaining": user.bonus_pixels or 0,
+        "used_bonus": using_bonus,
     }
 
 
@@ -163,4 +165,15 @@ def get_cooldown(user: User = Depends(get_current_user)):
     if user.last_pixel_at:
         elapsed = (now - user.last_pixel_at).total_seconds()
         remaining = max(0, cooldown - elapsed)
-    return {"cooldown": cooldown, "remaining": remaining, "is_subscriber": is_sub}
+
+    # If has bonus pixels, no cooldown
+    bonus = user.bonus_pixels or 0
+    if bonus > 0:
+        remaining = 0
+
+    return {
+        "cooldown": cooldown,
+        "remaining": remaining,
+        "is_subscriber": is_sub,
+        "bonus_pixels": bonus,
+    }

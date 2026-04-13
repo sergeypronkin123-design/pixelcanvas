@@ -398,6 +398,11 @@ export function CanvasRenderer({ battleActive, onPixelPlaced, pixelUpdates }: Pr
               ) : (
                 <span className="text-xs font-mono text-canvas-muted">Пауза</span>
               )}
+              {(user as any).bonus_pixels > 0 && (
+                <span className="text-[10px] font-mono text-neon-cyan px-1.5 py-0.5 bg-neon-cyan/10 rounded-full">
+                  ⚡{(user as any).bonus_pixels}
+                </span>
+              )}
             </div>
           )}
         </div>
