@@ -4,7 +4,8 @@ import { api } from '@/lib/api';
 interface User {
   id: number; email: string; username: string; is_admin: boolean;
   is_subscriber: boolean; subscription_until: string | null;
-  pixels_placed_total: number; created_at: string;
+  pixels_placed_total: number; referral_code: string | null;
+  bonus_pixels: number; created_at: string;
 }
 
 interface AuthState {
