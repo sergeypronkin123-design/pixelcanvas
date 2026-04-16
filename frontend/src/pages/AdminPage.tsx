@@ -51,30 +51,57 @@ export function AdminPage() {
             <>
               {/* Stats */}
               {stats && (
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-                  <div className="card !p-4">
-                    <Users size={18} className="text-orange-400 mb-2" />
-                    <div className="text-2xl font-display font-bold text-canvas-bright">{stats.total_users}</div>
-                    <div className="text-xs text-canvas-muted">Пользователей</div>
-                  </div>
-                  <div className="card !p-4">
-                    <Crosshair size={18} className="text-neon-green mb-2" />
-                    <div className="text-2xl font-display font-bold text-canvas-bright">{stats.total_pixels?.toLocaleString()}</div>
-                    <div className="text-xs text-canvas-muted">Пикселей</div>
-                  </div>
-                  <div className="card !p-4">
-                    <Crown size={18} className="text-yellow-400 mb-2" />
-                    <div className="text-2xl font-display font-bold text-canvas-bright">{stats.total_subscribers}</div>
-                    <div className="text-xs text-canvas-muted">Подписчиков Pro</div>
-                  </div>
-                  <div className="card !p-4">
-                    <DollarSign size={18} className="text-neon-cyan mb-2" />
-                    <div className="text-lg font-display font-bold text-canvas-bright">
-                      ${((stats.total_revenue_usd || 0) / 100).toFixed(2)} / {((stats.total_revenue_rub || 0) / 100).toFixed(0)}₽
+                <>
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+                    <div className="card !p-4">
+                      <Users size={18} className="text-orange-400 mb-2" />
+                      <div className="text-2xl font-display font-bold text-canvas-bright">{stats.total_users}</div>
+                      <div className="text-xs text-canvas-muted">Пользователей</div>
                     </div>
-                    <div className="text-xs text-canvas-muted">Доход</div>
+                    <div className="card !p-4">
+                      <Crosshair size={18} className="text-neon-green mb-2" />
+                      <div className="text-2xl font-display font-bold text-canvas-bright">{stats.total_pixels?.toLocaleString()}</div>
+                      <div className="text-xs text-canvas-muted">Пикселей</div>
+                    </div>
+                    <div className="card !p-4">
+                      <Crown size={18} className="text-yellow-400 mb-2" />
+                      <div className="text-2xl font-display font-bold text-canvas-bright">{stats.total_subscribers}</div>
+                      <div className="text-xs text-canvas-muted">Подписчиков Pro</div>
+                    </div>
+                    <div className="card !p-4">
+                      <Swords size={18} className="text-red-400 mb-2" />
+                      <div className="text-2xl font-display font-bold text-canvas-bright">{stats.total_clans || 0}</div>
+                      <div className="text-xs text-canvas-muted">Кланов</div>
+                    </div>
                   </div>
-                </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                    <div className="card !p-4">
+                      <DollarSign size={18} className="text-neon-cyan mb-2" />
+                      <div className="text-xl font-display font-bold text-canvas-bright">
+                        {((stats.total_revenue_rub || 0) / 100).toFixed(0)}₽
+                      </div>
+                      <div className="text-xs text-canvas-muted">Общий доход (₽)</div>
+                      {stats.total_revenue_usd > 0 && (
+                        <div className="text-xs text-canvas-muted mt-1">+ ${((stats.total_revenue_usd || 0) / 100).toFixed(2)}</div>
+                      )}
+                    </div>
+                    <div className="card !p-4">
+                      <Crown size={18} className="text-yellow-400 mb-2" />
+                      <div className="text-xl font-display font-bold text-canvas-bright">
+                        {((stats.subscription_revenue_rub || 0) / 100).toFixed(0)}₽
+                      </div>
+                      <div className="text-xs text-canvas-muted">Pro подписки</div>
+                    </div>
+                    <div className="card !p-4">
+                      <Swords size={18} className="text-red-400 mb-2" />
+                      <div className="text-xl font-display font-bold text-canvas-bright">
+                        {((stats.clan_donations_revenue_rub || 0) / 100).toFixed(0)}₽
+                      </div>
+                      <div className="text-xs text-canvas-muted">Клановые донаты ({stats.clan_donations_count || 0})</div>
+                    </div>
+                  </div>
+                </>
               )}
 
               {/* Tabs */}

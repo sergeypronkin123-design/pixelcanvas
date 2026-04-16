@@ -11,7 +11,7 @@ import { OfferPage, ContactsPage, RefundPage, PrivacyPage } from '@/pages/LegalP
 import { AdminPage } from '@/pages/AdminPage';
 import { LeaderboardPage } from '@/pages/LeaderboardPage';
 import { ReferralPage } from '@/pages/ReferralPage';
-import { ClansListPage, CreateClanPage, MyClanPage, ClanDetailPage } from '@/pages/ClanPages';
+import { ClansListPage, CreateClanPage, MyClanPage, ClanDetailPage, ClanInvitePage } from '@/pages/ClanPages';
 import { ShopPage, AchievementsPage } from '@/pages/EconomyPages';
 import '@/styles/globals.css';
 
@@ -44,6 +44,7 @@ function App() {
         <Route path="/clans" element={<ClansListPage />} />
         <Route path="/clans/create" element={<CreateClanPage />} />
         <Route path="/clans/my" element={<MyClanPage />} />
+        <Route path="/clans/invite/:code" element={<ClanInvitePage />} />
         <Route path="/clans/:id" element={<ClanDetailPage />} />
         <Route path="/shop" element={<ShopPage />} />
         <Route path="/achievements" element={<AchievementsPage />} />

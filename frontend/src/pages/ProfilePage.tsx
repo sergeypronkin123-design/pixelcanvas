@@ -1,17 +1,42 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuthStore } from '@/stores/authStore';
 import { Navbar } from '@/components/layout/Navbar';
 import { Footer } from '@/components/layout/Footer';
 import { motion } from 'framer-motion';
-import { User, Crown, Crosshair, Calendar, TrendingUp } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { User, Crown, Crosshair, Calendar, TrendingUp, Shield, Coins, Trophy } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
 import { getRank, getNextRank, getProgress, RANKS } from '@/lib/ranks';
+
+const API = import.meta.env.VITE_API_URL || '';
 
 export function ProfilePage() {
   const { user } = useAuthStore();
   const navigate = useNavigate();
+  const [clan, setClan] = useState<any>(null);
+  const [balance, setBalance] = useState<number | null>(null);
 
   useEffect(() => { if (!user) navigate('/login'); }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    // Load clan info
+    if (user.clan_id) {
+      fetch(`${API}/api/clans/my`, { headers: { Authorization: `Bearer ${token}` } })
+        .then((r) => r.ok ? r.json() : null)
+        .then((d) => { if (d?.clan) setClan({ ...d.clan, territory: d.territory_pixels, my_role: d.my_role }); })
+        .catch(() => {});
+    }
+
+    // Load coin balance
+    fetch(`${API}/api/economy/balance`, { headers: { Authorization: `Bearer ${token}` } })
+      .then((r) => r.ok ? r.json() : null)
+      .then((d) => { if (d) setBalance(d.balance); })
+      .catch(() => {});
+  }, [user]);
+
   if (!user) return null;
 
   const pixels = user.pixels_placed_total || 0;
@@ -85,12 +110,51 @@ export function ProfilePage() {
             </div>
           </div>
 
+          {/* Clan card */}
+          {clan && (
+            <Link to="/clans/my" className="card mb-6 block hover:border-orange-500/40 transition-all">
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 rounded-xl flex items-center justify-center text-2xl flex-shrink-0"
+                  style={{ backgroundColor: clan.color }}>
+                  {clan.emoji || '⚔'}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Shield size={14} className="text-orange-400" />
+                    <span className="text-xs text-canvas-muted">В клане</span>
+                    {clan.my_role === 'leader' && (
+                      <span className="px-2 py-0.5 rounded-full bg-yellow-500/10 border border-yellow-500/30 text-[10px] font-display font-bold text-yellow-400 flex items-center gap-1">
+                        <Crown size={9} /> ЛИДЕР
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span className="text-orange-400 font-mono font-bold">[{clan.tag}]</span>
+                    <h2 className="font-display font-bold text-lg text-canvas-bright truncate">{clan.name}</h2>
+                  </div>
+                  <div className="flex gap-4 mt-1 text-xs text-canvas-muted">
+                    <span>👥 {clan.members_count}/{clan.max_members}</span>
+                    <span>🎯 {(clan.territory || 0).toLocaleString()} территория</span>
+                    <span>🏆 {clan.battles_won || 0} побед</span>
+                  </div>
+                </div>
+              </div>
+            </Link>
+          )}
+
           {/* Stats */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
             <div className="card !p-4 text-center">
               <Crosshair size={18} className="text-orange-400 mx-auto mb-2" />
               <div className="text-xl font-display font-bold text-canvas-bright">{pixels.toLocaleString()}</div>
               <div className="text-xs text-canvas-muted">Пикселей</div>
+            </div>
+            <div className="card !p-4 text-center">
+              <Coins size={18} className="text-yellow-400 mx-auto mb-2" />
+              <div className="text-xl font-display font-bold text-canvas-bright">
+                {balance !== null ? balance.toLocaleString() : '...'}
+              </div>
+              <div className="text-xs text-canvas-muted">PixelCoin</div>
             </div>
             <div className="card !p-4 text-center">
               <Calendar size={18} className="text-neon-green mx-auto mb-2" />

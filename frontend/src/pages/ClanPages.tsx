@@ -174,6 +174,8 @@ export function CreateClanPage() {
         method: 'POST',
         body: JSON.stringify({ name, tag, description, color, emoji, is_open: isOpen, max_members: maxMembers }),
       });
+      // Перезагрузить user чтобы clan_id обновился в store
+      await useAuthStore.getState().loadUser();
       navigate('/clans/my');
     } catch (err: any) { setError(err.message); } finally { setLoading(false); }
   };
@@ -226,22 +228,26 @@ export function CreateClanPage() {
 
                   <div className="text-center text-xs text-canvas-muted">— ИЛИ —</div>
 
-                  <div className={`p-3 rounded-xl border ${eligibility?.has_donation ? 'border-neon-green/40 bg-neon-green/5' : 'border-canvas-border bg-canvas-bg'}`}>
+                  <div className={`p-4 rounded-xl border ${eligibility?.has_donation ? 'border-neon-green/40 bg-neon-green/5' : 'border-purple-500/30 bg-purple-500/5'}`}>
                     <div className="flex items-center justify-between mb-2">
                       <span className="font-display font-semibold text-sm text-canvas-bright flex items-center gap-2">
-                        💝 Задонатить 100 ₽
+                        💝 Ускоренный старт
                       </span>
                       {eligibility?.has_donation && <CheckCircle size={14} className="text-neon-green" />}
                     </div>
+                    <p className="text-xs text-canvas-muted mb-3">
+                      Разовая оплата <span className="text-canvas-bright font-semibold">100 ₽</span> разблокирует создание клана без требований.
+                      Это <strong className="text-purple-400">не подписка</strong> — платёж только один раз.
+                    </p>
                     {!eligibility?.has_donation && (
                       <div className="space-y-2 mt-3">
                         <button onClick={() => handleDonate('robokassa')} disabled={loading}
-                          className="btn-primary w-full !py-2 text-sm">
-                          Оплатить 100 ₽
+                          className="w-full px-4 py-2.5 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-xl font-display font-bold hover:from-purple-400 hover:to-pink-400 transition-all disabled:opacity-40 flex items-center justify-center gap-2">
+                          <Shield size={14} /> {loading ? '...' : 'Разблокировать за 100 ₽'}
                         </button>
                         <button onClick={() => handleDonate('stripe')} disabled={loading}
-                          className="w-full px-4 py-2 bg-canvas-elevated border border-canvas-border text-canvas-muted rounded-xl text-sm hover:border-orange-500/30 transition-all">
-                          $1.99 international card
+                          className="w-full px-4 py-2 bg-canvas-elevated border border-canvas-border text-canvas-muted rounded-xl text-sm hover:border-purple-500/30 transition-all">
+                          $1.99 международная карта
                         </button>
                       </div>
                     )}
@@ -330,7 +336,6 @@ export function MyClanPage() {
   const navigate = useNavigate();
   const [data, setData] = useState<any>(null);
   const [invites, setInvites] = useState<any[]>([]);
-  const [inviteUsername, setInviteUsername] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
 
@@ -343,15 +348,6 @@ export function MyClanPage() {
     if (!user) { navigate('/login'); return; }
     load();
   }, [user]);
-
-  const handleInvite = async () => {
-    setError('');
-    try {
-      await fetchApi(`/api/clans/${data.clan.id}/invite?username=${encodeURIComponent(inviteUsername)}`, { method: 'POST' });
-      setInviteUsername('');
-      alert('Приглашение отправлено!');
-    } catch (err: any) { setError(err.message); }
-  };
 
   const handleLeave = async () => {
     if (!confirm('Точно покинуть клан?')) return;
@@ -485,18 +481,52 @@ export function MyClanPage() {
               </div>
             </div>
 
-            {/* Invite box */}
+            {/* Invite link */}
             <div className="card mb-4">
-              <h3 className="font-display font-semibold text-sm text-canvas-bright mb-2 flex items-center gap-2">
-                <UserPlus size={14} className="text-neon-green" /> Пригласить игрока
+              <h3 className="font-display font-semibold text-sm text-canvas-bright mb-3 flex items-center gap-2">
+                <UserPlus size={14} className="text-neon-green" /> Пригласить игроков
               </h3>
-              <div className="flex gap-2">
-                <input type="text" value={inviteUsername} onChange={(e) => setInviteUsername(e.target.value)}
-                  className="input-field" placeholder="username" />
-                <button onClick={handleInvite} disabled={!inviteUsername}
-                  className="btn-primary !px-4 !py-2 text-sm flex-shrink-0">Пригласить</button>
-              </div>
-              {error && <p className="text-red-400 text-xs mt-2">{error}</p>}
+              {c.invite_code ? (
+                <>
+                  <p className="text-xs text-canvas-muted mb-2">
+                    Поделитесь этой ссылкой — любой, кто перейдёт по ней, сможет вступить в клан:
+                  </p>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={`${window.location.origin}/clans/invite/${c.invite_code}`}
+                      readOnly
+                      onClick={(e) => (e.target as HTMLInputElement).select()}
+                      className="input-field font-mono text-xs"
+                    />
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(`${window.location.origin}/clans/invite/${c.invite_code}`);
+                        alert('Ссылка скопирована!');
+                      }}
+                      className="btn-primary !px-4 !py-2 text-sm flex-shrink-0"
+                    >
+                      Копировать
+                    </button>
+                  </div>
+                  {isLeader && (
+                    <button
+                      onClick={async () => {
+                        if (!confirm('Сгенерировать новую ссылку? Старая перестанет работать.')) return;
+                        try {
+                          await fetchApi(`/api/clans/${c.id}/regenerate-invite`, { method: 'POST' });
+                          load();
+                        } catch (e: any) { alert(e.message); }
+                      }}
+                      className="text-xs text-canvas-muted hover:text-orange-400 mt-2"
+                    >
+                      🔄 Обновить ссылку
+                    </button>
+                  )}
+                </>
+              ) : (
+                <p className="text-xs text-canvas-muted">Инвайт-ссылка недоступна</p>
+              )}
             </div>
 
             {/* Members */}
@@ -627,6 +657,126 @@ export function ClanDetailPage() {
 
               {!user && (
                 <Link to="/login" className="btn-primary w-full text-center block">Войти, чтобы вступить</Link>
+              )}
+            </div>
+          </motion.div>
+        </div>
+      </main>
+      <Footer />
+    </div>
+  );
+}
+
+
+// ============ CLAN INVITE ACCEPT PAGE ============
+export function ClanInvitePage() {
+  const { code } = useParams<{ code: string }>();
+  const user = useAuthStore((s) => s.user);
+  const navigate = useNavigate();
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [joining, setJoining] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (!code) return;
+    fetchApi(`/api/clans/invite/${code}`).then(setData).catch((e) => setError(e.message)).finally(() => setLoading(false));
+  }, [code]);
+
+  const handleJoin = async () => {
+    if (!user) {
+      // Save invite code and redirect to login
+      localStorage.setItem('pending_invite', code || '');
+      navigate('/login');
+      return;
+    }
+    setJoining(true);
+    try {
+      const r = await fetchApi(`/api/clans/join-by-code/${code}`, { method: 'POST' });
+      await useAuthStore.getState().loadUser();
+      navigate('/clans/my');
+    } catch (err: any) {
+      setError(err.message);
+      setJoining(false);
+    }
+  };
+
+  if (loading) return (
+    <div className="min-h-screen bg-canvas-bg"><Navbar />
+      <div className="max-w-xl mx-auto px-4 pt-24 text-center text-canvas-muted">Загрузка приглашения...</div>
+    </div>
+  );
+
+  if (error || !data?.clan) return (
+    <div className="min-h-screen bg-canvas-bg flex flex-col"><Navbar />
+      <main className="flex-1">
+        <div className="max-w-xl mx-auto px-4 sm:px-6 pt-20 sm:pt-24 pb-12">
+          <div className="card text-center py-10">
+            <XCircle size={36} className="text-red-400 mx-auto mb-3" />
+            <h1 className="font-display font-bold text-xl text-canvas-bright mb-2">Приглашение недействительно</h1>
+            <p className="text-canvas-muted text-sm mb-6">{error || 'Эта ссылка устарела или не существует.'}</p>
+            <Link to="/clans" className="btn-secondary">Все кланы</Link>
+          </div>
+        </div>
+      </main>
+      <Footer />
+    </div>
+  );
+
+  const c = data.clan;
+  const isMember = user?.clan_id === c.id;
+
+  return (
+    <div className="min-h-screen bg-canvas-bg flex flex-col"><Navbar />
+      <main className="flex-1">
+        <div className="max-w-xl mx-auto px-4 sm:px-6 pt-20 sm:pt-24 pb-12">
+          <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }}>
+            <div className="card border-orange-500/30">
+              <div className="text-center mb-5">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-orange-500/10 border border-orange-500/30 text-xs font-display font-bold text-orange-400 mb-4">
+                  <Mail size={11} /> ПРИГЛАШЕНИЕ В КЛАН
+                </div>
+                <div className="w-20 h-20 mx-auto rounded-2xl flex items-center justify-center text-4xl mb-3"
+                  style={{ backgroundColor: c.color }}>
+                  {c.emoji || '⚔'}
+                </div>
+                <div className="flex items-center justify-center gap-2 flex-wrap">
+                  <span className="text-orange-400 font-mono font-bold">[{c.tag}]</span>
+                  <h1 className="font-display font-bold text-2xl text-canvas-bright">{c.name}</h1>
+                </div>
+                <p className="text-xs text-canvas-muted mt-1">Лидер: {data.leader_username}</p>
+              </div>
+
+              {c.description && (
+                <p className="text-sm text-canvas-muted mb-4 bg-canvas-bg p-3 rounded-xl text-center">{c.description}</p>
+              )}
+
+              <div className="grid grid-cols-3 gap-2 text-center mb-5">
+                <div>
+                  <div className="text-lg font-display font-bold text-canvas-bright">{c.members_count}/{c.max_members}</div>
+                  <div className="text-[10px] text-canvas-muted">Участников</div>
+                </div>
+                <div>
+                  <div className="text-lg font-display font-bold text-canvas-bright">{data.territory_pixels?.toLocaleString() || 0}</div>
+                  <div className="text-[10px] text-canvas-muted">Территория</div>
+                </div>
+                <div>
+                  <div className="text-lg font-display font-bold text-canvas-bright">{c.battles_won}</div>
+                  <div className="text-[10px] text-canvas-muted">Побед</div>
+                </div>
+              </div>
+
+              {isMember ? (
+                <Link to="/clans/my" className="btn-primary w-full text-center block">Вы уже в этом клане</Link>
+              ) : c.members_count >= c.max_members ? (
+                <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-center">
+                  <span className="text-sm text-red-400">Клан переполнен</span>
+                </div>
+              ) : (
+                <button onClick={handleJoin} disabled={joining}
+                  className="btn-primary w-full">
+                  {joining ? 'Вступаем...' : user ? 'Вступить в клан' : 'Войти и вступить'}
+                </button>
               )}
             </div>
           </motion.div>

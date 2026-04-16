@@ -19,7 +19,13 @@ export function LoginPage() {
     try {
       const res = await api.login(email, password);
       setAuth(res.user, res.access_token);
-      navigate('/canvas');
+      const pendingInvite = localStorage.getItem('pending_invite');
+      if (pendingInvite) {
+        localStorage.removeItem('pending_invite');
+        navigate(`/clans/invite/${pendingInvite}`);
+      } else {
+        navigate('/canvas');
+      }
     } catch (err: any) { setError(err.message); } finally { setLoading(false); }
   };
 
@@ -73,7 +79,13 @@ export function RegisterPage() {
       const res = await api.register(email, username, password, refCode);
       setAuth(res.user, res.access_token);
       localStorage.removeItem('pixelstake_ref'); // Clean up after successful registration
-      navigate('/canvas');
+      const pendingInvite = localStorage.getItem('pending_invite');
+      if (pendingInvite) {
+        localStorage.removeItem('pending_invite');
+        navigate(`/clans/invite/${pendingInvite}`);
+      } else {
+        navigate('/canvas');
+      }
     } catch (err: any) { setError(err.message); } finally { setLoading(false); }
   };
 
