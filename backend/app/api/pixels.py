@@ -95,9 +95,10 @@ def place_pixel(data: PlacePixelRequest, user: User = Depends(get_current_user),
     if existing:
         existing.color = data.color
         existing.user_id = user.id
+        existing.clan_id = user.clan_id  # пиксель переходит к клану нового владельца
         existing.placed_at = now
     else:
-        pixel = Pixel(x=data.x, y=data.y, color=data.color, user_id=user.id, placed_at=now)
+        pixel = Pixel(x=data.x, y=data.y, color=data.color, user_id=user.id, clan_id=user.clan_id, placed_at=now)
         db.add(pixel)
 
     # Update user
@@ -107,6 +108,16 @@ def place_pixel(data: PlacePixelRequest, user: User = Depends(get_current_user),
     # Spend bonus pixel if used
     if using_bonus:
         user.bonus_pixels = (user.bonus_pixels or 0) - 1
+
+    # Update clan stats
+    if user.clan_id:
+        from app.models.clan import Clan, ClanMember
+        clan = db.query(Clan).filter(Clan.id == user.clan_id).first()
+        if clan:
+            clan.total_pixels_placed = (clan.total_pixels_placed or 0) + 1
+        cm = db.query(ClanMember).filter(ClanMember.user_id == user.id, ClanMember.clan_id == user.clan_id).first()
+        if cm:
+            cm.pixels_placed_in_clan = (cm.pixels_placed_in_clan or 0) + 1
 
     # Track battle participation
     current_month = now.month

@@ -1,6 +1,6 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/stores/authStore';
-import { Crosshair, User, LogOut, Crown, Menu, X, Trophy, Share2 } from 'lucide-react';
+import { Crosshair, User, LogOut, Crown, Menu, X, Trophy, Share2, Shield } from 'lucide-react';
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -26,6 +26,9 @@ export function Navbar() {
             <Link to="/canvas" className="px-3 py-1.5 text-sm text-canvas-muted hover:text-canvas-bright hover:bg-canvas-elevated rounded-lg transition-all">Battle</Link>
             <Link to="/leaderboard" className="px-3 py-1.5 text-sm text-canvas-muted hover:text-canvas-bright hover:bg-canvas-elevated rounded-lg transition-all flex items-center gap-1">
               <Trophy size={13} /> Топ
+            </Link>
+            <Link to="/clans" className="px-3 py-1.5 text-sm text-canvas-muted hover:text-canvas-bright hover:bg-canvas-elevated rounded-lg transition-all flex items-center gap-1">
+              <Shield size={13} /> Кланы
             </Link>
             <Link to="/subscribe" className="px-3 py-1.5 text-sm text-orange-400/80 hover:text-orange-400 hover:bg-canvas-elevated rounded-lg transition-all flex items-center gap-1">
               <Crown size={13} /> Pro
@@ -63,6 +66,7 @@ export function Navbar() {
             <div className="px-4 py-2 space-y-1">
               <Link to="/canvas" onClick={() => setOpen(false)} className="block px-3 py-2 text-sm text-canvas-muted rounded-lg">Battle</Link>
               <Link to="/leaderboard" onClick={() => setOpen(false)} className="block px-3 py-2 text-sm text-canvas-muted rounded-lg">Топ игроков</Link>
+              <Link to="/clans" onClick={() => setOpen(false)} className="block px-3 py-2 text-sm text-canvas-muted rounded-lg">Кланы</Link>
               <Link to="/subscribe" onClick={() => setOpen(false)} className="block px-3 py-2 text-sm text-orange-400 rounded-lg">Pro</Link>
               {user ? (
                 <>

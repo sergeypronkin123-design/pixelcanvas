@@ -115,16 +115,23 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
         session_data = event_data.get("object") if isinstance(event_data, dict) else getattr(event_data, "object", None)
         if session_data:
             metadata = session_data.get("metadata", {}) if isinstance(session_data, dict) else getattr(session_data, "metadata", {})
+            session_id = session_data.get("id") if isinstance(session_data, dict) else getattr(session_data, "id", None)
+
             if metadata.get("type") == "subscription":
                 user_id = int(metadata.get("user_id", 0))
                 user = db.query(User).filter(User.id == user_id).first()
                 if user:
                     user.is_subscriber = True
                     user.subscription_until = datetime.now(timezone.utc) + timedelta(days=30)
-                    session_id = session_data.get("id") if isinstance(session_data, dict) else getattr(session_data, "id", None)
                     sub = db.query(Subscription).filter(Subscription.provider_session_id == str(session_id)).first()
                     if sub:
                         sub.status = "paid"
+
+            elif metadata.get("type") == "clan_donation":
+                from app.models.clan import ClanDonation
+                donation = db.query(ClanDonation).filter(ClanDonation.provider_session_id == str(session_id)).first()
+                if donation:
+                    donation.status = "paid"
 
     we.processed = True
     db.commit()
@@ -160,6 +167,11 @@ async def yukassa_webhook(request: Request, db: Session = Depends(get_db)):
                 sub = db.query(Subscription).filter(Subscription.provider_session_id == payment_id).first()
                 if sub:
                     sub.status = "paid"
+        elif metadata.get("type") == "clan_donation":
+            from app.models.clan import ClanDonation
+            donation = db.query(ClanDonation).filter(ClanDonation.provider_session_id == payment_id).first()
+            if donation:
+                donation.status = "paid"
 
     we.processed = True
     db.commit()

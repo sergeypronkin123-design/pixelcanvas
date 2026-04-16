@@ -42,6 +42,8 @@ class UserOut(BaseModel):
     pixels_placed_total: int
     referral_code: str | None
     bonus_pixels: int
+    clan_id: int | None
+    clan_role: str | None
     created_at: datetime
 
     class Config:

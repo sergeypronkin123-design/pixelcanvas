@@ -11,6 +11,7 @@ import { OfferPage, ContactsPage, RefundPage, PrivacyPage } from '@/pages/LegalP
 import { AdminPage } from '@/pages/AdminPage';
 import { LeaderboardPage } from '@/pages/LeaderboardPage';
 import { ReferralPage } from '@/pages/ReferralPage';
+import { ClansListPage, CreateClanPage, MyClanPage, ClanDetailPage } from '@/pages/ClanPages';
 import '@/styles/globals.css';
 
 function App() {
@@ -39,6 +40,10 @@ function App() {
         <Route path="/subscribe/cancel" element={<SubscribeCancelPage />} />
         <Route path="/leaderboard" element={<LeaderboardPage />} />
         <Route path="/referral" element={<ReferralPage />} />
+        <Route path="/clans" element={<ClansListPage />} />
+        <Route path="/clans/create" element={<CreateClanPage />} />
+        <Route path="/clans/my" element={<MyClanPage />} />
+        <Route path="/clans/:id" element={<ClanDetailPage />} />
         <Route path="/offer" element={<OfferPage />} />
         <Route path="/contacts" element={<ContactsPage />} />
         <Route path="/refund" element={<RefundPage />} />

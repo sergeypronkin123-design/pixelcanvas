@@ -16,4 +16,7 @@ class User(Base):
     referral_code = Column(String(20), unique=True, nullable=True, index=True)
     referred_by = Column(Integer, nullable=True, index=True)
     bonus_pixels = Column(Integer, default=0)
+    clan_id = Column(Integer, nullable=True, index=True)
+    clan_role = Column(String(20), nullable=True)
+    clan_join_available_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
