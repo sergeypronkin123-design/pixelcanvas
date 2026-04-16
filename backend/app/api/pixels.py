@@ -96,7 +96,7 @@ def get_canvas_binary(db: Session = Depends(get_db)):
 
 
 @router.post("/place")
-def place_pixel(data: PlacePixelRequest, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+async def place_pixel(data: PlacePixelRequest, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     if not is_battle_active():
         raise HTTPException(400, "Батл не активен. Приходи 1 числа!")
 
@@ -106,10 +106,8 @@ def place_pixel(data: PlacePixelRequest, user: User = Depends(get_current_user),
     # Check if user has bonus pixels (skip cooldown if yes)
     using_bonus = False
     if (user.bonus_pixels or 0) > 0:
-        # Has bonus pixels — skip cooldown, use one bonus
         using_bonus = True
     else:
-        # Normal cooldown check
         cooldown = get_cooldown_seconds(is_sub)
         if user.last_pixel_at:
             elapsed = (now - user.last_pixel_at).total_seconds()
@@ -125,7 +123,7 @@ def place_pixel(data: PlacePixelRequest, user: User = Depends(get_current_user),
     if existing:
         existing.color = data.color
         existing.user_id = user.id
-        existing.clan_id = user.clan_id  # пиксель переходит к клану нового владельца
+        existing.clan_id = user.clan_id
         existing.placed_at = now
     else:
         pixel = Pixel(x=data.x, y=data.y, color=data.color, user_id=user.id, clan_id=user.clan_id, placed_at=now)
@@ -135,7 +133,6 @@ def place_pixel(data: PlacePixelRequest, user: User = Depends(get_current_user),
     user.last_pixel_at = now
     user.pixels_placed_total = (user.pixels_placed_total or 0) + 1
 
-    # Spend bonus pixel if used
     if using_bonus:
         user.bonus_pixels = (user.bonus_pixels or 0) - 1
 
@@ -172,34 +169,40 @@ def place_pixel(data: PlacePixelRequest, user: User = Depends(get_current_user),
 
     db.commit()
 
-    # Award PixelCoin + check achievements
-    try:
-        from app.services import economy
-        economy.add_coins(db, user.id, economy.COIN_PER_PIXEL, "pixel_placed",
-                          {"x": data.x, "y": data.y})
-        db.commit()
-        # Achievements check (every 10 pixels to reduce load)
-        if (user.pixels_placed_total or 0) % 10 == 0 or (user.pixels_placed_total or 0) < 10:
-            economy.check_achievements_for_user(db, user.id)
-    except Exception as e:
-        logger.error(f"Economy update error: {e}")
-
-    # Update canvas cache
+    # Update canvas cache (мгновенно, in-memory)
     try:
         from app.services.canvas_cache import canvas_cache
         canvas_cache.set_pixel(data.x, data.y, data.color, user.id, user.clan_id)
     except Exception as e:
         logger.error(f"Canvas cache update error: {e}")
 
-    # Broadcast (batched)
+    # Broadcast СРАЗУ через await (а не ensure_future!)
+    # Это ключ к мгновенному обновлению у других игроков
     try:
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
-            asyncio.ensure_future(manager.broadcast_pixel(
-                data.x, data.y, data.color, user.id, user.clan_id
-            ))
+        await manager.broadcast_pixel(data.x, data.y, data.color, user.id, user.clan_id)
     except Exception as e:
         logger.error(f"Broadcast error: {e}")
+
+    # PixelCoin + достижения — в фоне, НЕ блокируя ответ пользователю
+    user_id = user.id
+    pixels_total = user.pixels_placed_total or 0
+
+    async def _background_economy():
+        from app.core.database import SessionLocal
+        bg_db = SessionLocal()
+        try:
+            from app.services import economy
+            economy.add_coins(bg_db, user_id, economy.COIN_PER_PIXEL, "pixel_placed",
+                              {"x": data.x, "y": data.y})
+            bg_db.commit()
+            if pixels_total % 10 == 0 or pixels_total < 10:
+                economy.check_achievements_for_user(bg_db, user_id)
+        except Exception as e:
+            logger.error(f"Background economy error: {e}")
+        finally:
+            bg_db.close()
+
+    asyncio.create_task(_background_economy())
 
     cooldown = 0 if (user.bonus_pixels or 0) > 0 else get_cooldown_seconds(is_sub)
 

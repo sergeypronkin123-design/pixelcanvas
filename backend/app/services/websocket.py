@@ -11,7 +11,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-BATCH_INTERVAL_MS = 100  # отправляем пачку раз в 100мс
+BATCH_INTERVAL_MS = 50  # 50мс — почти мгновенно для глаз
 
 
 class ConnectionManager:
