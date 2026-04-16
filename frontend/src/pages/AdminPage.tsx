@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useAuthStore } from '@/stores/authStore';
 import { Navbar } from '@/components/layout/Navbar';
+import { Footer } from '@/components/layout/Footer';
 import { motion } from 'framer-motion';
 import { Users, Crosshair, Crown, DollarSign, Swords } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -38,7 +39,8 @@ export function AdminPage() {
   if (!user?.is_admin) return null;
 
   return (
-    <div className="min-h-screen bg-canvas-bg"><Navbar />
+    <div className="min-h-screen bg-canvas-bg flex flex-col"><Navbar />
+      <main className="flex-1">
       <div className="max-w-6xl mx-auto px-6 pt-24 pb-16">
         <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }}>
           <h1 className="font-display font-bold text-3xl text-canvas-bright mb-8">Админ-панель</h1>
@@ -189,6 +191,8 @@ export function AdminPage() {
           )}
         </motion.div>
       </div>
+      </main>
+      <Footer />
     </div>
   );
 }

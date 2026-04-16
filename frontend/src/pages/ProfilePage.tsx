@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useAuthStore } from '@/stores/authStore';
 import { Navbar } from '@/components/layout/Navbar';
+import { Footer } from '@/components/layout/Footer';
 import { motion } from 'framer-motion';
 import { User, Crown, Crosshair, Calendar, TrendingUp } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -20,7 +21,8 @@ export function ProfilePage() {
   const isSub = user.is_subscriber && user.subscription_until && new Date(user.subscription_until) > new Date();
 
   return (
-    <div className="min-h-screen bg-canvas-bg"><Navbar />
+    <div className="min-h-screen bg-canvas-bg flex flex-col"><Navbar />
+      <main className="flex-1">
       <div className="max-w-3xl mx-auto px-6 pt-24 pb-16">
         <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }}>
 
@@ -137,9 +139,10 @@ export function ProfilePage() {
               </div>
             </div>
           </div>
-
         </motion.div>
       </div>
+      </main>
+      <Footer />
     </div>
   );
 }

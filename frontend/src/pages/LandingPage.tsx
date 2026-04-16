@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Crosshair, Zap, ArrowRight, Clock, Users, Crown, Swords, Smartphone } from 'lucide-react';
 import { Navbar } from '@/components/layout/Navbar';
+import { Footer } from '@/components/layout/Footer';
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 
@@ -211,21 +212,7 @@ export function LandingPage() {
       {/* Install app */}
       <InstallBanner />
 
-      {/* Footer */}
-      <footer className="border-t border-canvas-border py-8 px-6">
-        <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <Crosshair size={14} className="text-orange-400" />
-            <span className="font-display font-semibold text-sm text-canvas-muted">Pixel<span className="text-orange-400">Stake</span></span>
-          </div>
-          <div className="flex gap-6 text-xs text-canvas-muted">
-            <Link to="/offer" className="hover:text-canvas-bright transition-colors">Оферта</Link>
-            <Link to="/refund" className="hover:text-canvas-bright transition-colors">Возврат</Link>
-            <Link to="/privacy" className="hover:text-canvas-bright transition-colors">Конфиденциальность</Link>
-          </div>
-          <div className="text-xs text-canvas-muted">&copy; {new Date().getFullYear()} PixelStake</div>
-        </div>
-      </footer>
+      <Footer />
     </div>
   );
 }

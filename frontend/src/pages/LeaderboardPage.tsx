@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Navbar } from '@/components/layout/Navbar';
+import { Footer } from '@/components/layout/Footer';
 import { useAuthStore } from '@/stores/authStore';
 import { motion } from 'framer-motion';
 import { Trophy, Crown, Crosshair, Medal } from 'lucide-react';
@@ -40,7 +41,8 @@ export function LeaderboardPage() {
   };
 
   return (
-    <div className="min-h-screen bg-canvas-bg"><Navbar />
+    <div className="min-h-screen bg-canvas-bg flex flex-col"><Navbar />
+      <main className="flex-1">
       <div className="max-w-3xl mx-auto px-6 pt-24 pb-16">
         <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }}>
           <div className="text-center mb-10">
@@ -137,6 +139,8 @@ export function LeaderboardPage() {
           )}
         </motion.div>
       </div>
+      </main>
+      <Footer />
     </div>
   );
 }

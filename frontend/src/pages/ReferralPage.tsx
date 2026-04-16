@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Navbar } from '@/components/layout/Navbar';
+import { Footer } from '@/components/layout/Footer';
 import { useAuthStore } from '@/stores/authStore';
 import { motion } from 'framer-motion';
 import { Share2, Copy, Check, Users, Gift, Crosshair, Zap } from 'lucide-react';
@@ -64,7 +65,8 @@ export function ReferralPage() {
   const bonusPixels = user.bonus_pixels || 0;
 
   return (
-    <div className="min-h-screen bg-canvas-bg"><Navbar />
+    <div className="min-h-screen bg-canvas-bg flex flex-col"><Navbar />
+      <main className="flex-1">
       <div className="max-w-3xl mx-auto px-4 sm:px-6 pt-20 sm:pt-24 pb-16">
         <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }}>
           <div className="text-center mb-8">
@@ -167,6 +169,8 @@ export function ReferralPage() {
           )}
         </motion.div>
       </div>
+      </main>
+      <Footer />
     </div>
   );
 }
