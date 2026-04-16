@@ -34,7 +34,18 @@ class BattleStatus(BaseModel):
 
 
 @router.get("/status", response_model=BattleStatus)
-def get_status():
+def get_status(db: Session = Depends(get_db)):
+    # Opportunistically check battle finalization and pending redemptions
+    # (Render Free sleeps when idle, so scheduler may not run — check on requests too)
+    try:
+        from app.services import battle_awards
+        pending = battle_awards.should_finalize_current_battle(db)
+        if pending:
+            battle_awards.finalize_battle(db, pending)
+        battle_awards.check_and_process_pending_redemptions(db)
+    except Exception:
+        pass
+
     active = is_battle_active()
     return BattleStatus(
         is_active=active,

@@ -49,3 +49,23 @@ def list_battles(admin=Depends(require_admin), db: Session = Depends(get_db)):
         "is_active": b.is_active, "total_pixels": b.total_pixels_placed,
         "total_participants": b.total_participants,
     } for b in battles]
+
+
+@router.post("/battles/{battle_id}/finalize")
+def finalize_battle_manually(battle_id: int, admin=Depends(require_admin), db: Session = Depends(get_db)):
+    """Принудительно завершить батл и раздать награды (для тестирования)"""
+    from app.services import battle_awards
+    battle = db.query(Battle).filter(Battle.id == battle_id).first()
+    if not battle:
+        from fastapi import HTTPException
+        raise HTTPException(404, "Battle not found")
+    result = battle_awards.finalize_battle(db, battle)
+    return result
+
+
+@router.post("/redemptions/process")
+def process_redemptions_manually(admin=Depends(require_admin), db: Session = Depends(get_db)):
+    """Принудительно активировать все scheduled Pro подписки"""
+    from app.services import battle_awards
+    count = battle_awards.check_and_process_pending_redemptions(db)
+    return {"activated": count}

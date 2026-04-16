@@ -51,7 +51,15 @@ async def lifespan(app: FastAPI):
     finally:
         db.close()
 
+    # Запустить фоновый планировщик наград
+    import asyncio
+    from app.services.scheduler import scheduler_loop
+    scheduler_task = asyncio.create_task(scheduler_loop())
+
     yield
+
+    # Shutdown
+    scheduler_task.cancel()
 
 
 app = FastAPI(title="PixelStake API", version="2.0.0", lifespan=lifespan)
