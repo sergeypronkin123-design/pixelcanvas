@@ -514,7 +514,7 @@ def clan_leaderboard(limit: int = Query(30, le=100), db: Session = Depends(get_d
 
 @router.post("/donate/checkout")
 def donate_checkout(
-    provider: str = Query("yukassa", enum=["stripe", "yukassa"]),
+    provider: str = Query("robokassa", enum=["stripe", "yukassa", "robokassa"]),
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -587,3 +587,31 @@ def donate_checkout(
         db.add(donation)
         db.commit()
         return {"checkout_url": payment["confirmation"]["confirmation_url"]}
+
+    elif provider == "robokassa":
+        from app.services.robokassa import generate_payment_url
+
+        donation = ClanDonation(
+            user_id=user.id,
+            amount=CLAN_CREATE_DONATION_RUB,
+            currency="RUB",
+            provider="robokassa",
+            provider_session_id="",
+            status="pending",
+        )
+        db.add(donation)
+        db.flush()
+
+        amount_rub = CLAN_CREATE_DONATION_RUB / 100
+        url = generate_payment_url(
+            amount_rub=amount_rub,
+            inv_id=donation.id,
+            description="PixelStake — разблокировка создания клана",
+            user_email=user.email,
+            item_name="Разблокировка создания клана",
+            metadata={"user_id": str(user.id), "type": "clan_donation"},
+            is_test=settings.ROBOKASSA_TEST_MODE,
+        )
+        donation.provider_session_id = str(donation.id)
+        db.commit()
+        return {"checkout_url": url}

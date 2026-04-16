@@ -17,7 +17,7 @@ export function SubscribePage() {
     if (user) api.getSubStatus().then(setSubStatus).catch(() => {});
   }, [user]);
 
-  const handleSubscribe = async (provider: 'stripe' | 'yukassa') => {
+  const handleSubscribe = async (provider: 'stripe' | 'robokassa') => {
     if (!user) { navigate('/login'); return; }
     setLoading(true);
     try {
@@ -83,7 +83,7 @@ export function SubscribePage() {
                 </div>
 
                 <div className="space-y-2">
-                  <button onClick={() => handleSubscribe('yukassa')} disabled={loading}
+                  <button onClick={() => handleSubscribe('robokassa')} disabled={loading}
                     className="w-full px-6 py-3 bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-xl
                                font-display font-bold hover:from-orange-400 hover:to-red-400 transition-all
                                disabled:opacity-40 flex items-center justify-center gap-2">

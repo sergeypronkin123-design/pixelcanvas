@@ -178,7 +178,7 @@ export function CreateClanPage() {
     } catch (err: any) { setError(err.message); } finally { setLoading(false); }
   };
 
-  const handleDonate = async (provider: 'stripe' | 'yukassa') => {
+  const handleDonate = async (provider: 'stripe' | 'robokassa') => {
     setLoading(true);
     try {
       const res = await fetchApi(`/api/clans/donate/checkout?provider=${provider}`, { method: 'POST' });
@@ -235,7 +235,7 @@ export function CreateClanPage() {
                     </div>
                     {!eligibility?.has_donation && (
                       <div className="space-y-2 mt-3">
-                        <button onClick={() => handleDonate('yukassa')} disabled={loading}
+                        <button onClick={() => handleDonate('robokassa')} disabled={loading}
                           className="btn-primary w-full !py-2 text-sm">
                           Оплатить 100 ₽
                         </button>

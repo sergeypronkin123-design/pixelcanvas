@@ -20,7 +20,7 @@ router = APIRouter(prefix="/subscribe", tags=["subscription"])
 
 @router.post("/checkout")
 def create_subscription_checkout(
-    provider: str = Query("stripe", enum=["stripe", "yukassa"]),
+    provider: str = Query("robokassa", enum=["stripe", "yukassa", "robokassa"]),
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -87,6 +87,36 @@ def create_subscription_checkout(
         db.add(sub)
         db.commit()
         return {"checkout_url": payment["confirmation"]["confirmation_url"], "session_id": payment["id"]}
+
+    elif provider == "robokassa":
+        from app.services.robokassa import generate_payment_url
+
+        # Создаём subscription запись чтобы получить inv_id
+        sub = Subscription(
+            user_id=user.id,
+            provider="robokassa",
+            provider_session_id="",  # заполним после
+            amount=settings.SUB_PRICE_RUB,
+            currency="RUB",
+            status="pending",
+        )
+        db.add(sub)
+        db.flush()
+
+        amount_rub = settings.SUB_PRICE_RUB / 100
+        url = generate_payment_url(
+            amount_rub=amount_rub,
+            inv_id=sub.id,
+            description="PixelStake Pro — подписка на 30 дней",
+            user_email=user.email,
+            item_name="PixelStake Pro (30 дней)",
+            metadata={"user_id": str(user.id), "type": "subscription"},
+            is_test=settings.ROBOKASSA_TEST_MODE,
+        )
+
+        sub.provider_session_id = str(sub.id)  # Robokassa использует InvId
+        db.commit()
+        return {"checkout_url": url, "session_id": str(sub.id)}
 
 
 @router.post("/webhook/stripe")
@@ -176,6 +206,98 @@ async def yukassa_webhook(request: Request, db: Session = Depends(get_db)):
     we.processed = True
     db.commit()
     return {"status": "ok"}
+
+
+@router.post("/webhook/robokassa")
+async def robokassa_webhook(request: Request, db: Session = Depends(get_db)):
+    """
+    ResultURL от Robokassa. Вызывается после успешного платежа.
+    """
+    from app.services.robokassa import verify_payment_signature
+    from fastapi import Response
+
+    form = await request.form()
+    data = dict(form)
+    logger.info(f"Robokassa webhook: {data}")
+
+    out_sum = data.get("OutSum", "")
+    inv_id = data.get("InvId", "")
+    signature = data.get("SignatureValue", "")
+
+    shp_params = {k: v for k, v in data.items() if k.startswith("Shp_")}
+
+    if not verify_payment_signature(out_sum, inv_id, signature, shp_params):
+        logger.error(f"Invalid Robokassa signature for InvId={inv_id}")
+        raise HTTPException(400, "Invalid signature")
+
+    event_id = f"rk_{inv_id}"
+    existing = db.query(WebhookEvent).filter(WebhookEvent.external_id == event_id).first()
+    if existing and existing.processed:
+        return Response(content=f"OK{inv_id}", media_type="text/plain")
+
+    we = WebhookEvent(
+        provider="robokassa",
+        event_type="payment.succeeded",
+        external_id=event_id,
+        payload_json=json.dumps(data, default=str),
+        processed=False,
+    )
+    db.add(we)
+    db.flush()
+
+    payment_type = shp_params.get("Shp_type", "")
+    user_id_str = shp_params.get("Shp_user_id", "0")
+
+    try:
+        user_id = int(user_id_str)
+    except ValueError:
+        user_id = 0
+
+    if payment_type == "subscription":
+        user = db.query(User).filter(User.id == user_id).first()
+        if user:
+            now = datetime.now(timezone.utc)
+            current_until = user.subscription_until or now
+            if current_until < now:
+                current_until = now
+            user.is_subscriber = True
+            user.subscription_until = current_until + timedelta(days=30)
+            try:
+                sub_id = int(inv_id)
+                sub = db.query(Subscription).filter(Subscription.id == sub_id).first()
+                if sub:
+                    sub.status = "paid"
+            except ValueError:
+                pass
+
+    elif payment_type == "clan_donation":
+        from app.models.clan import ClanDonation
+        try:
+            donation_id = int(inv_id)
+            donation = db.query(ClanDonation).filter(ClanDonation.id == donation_id).first()
+            if donation:
+                donation.status = "paid"
+        except ValueError:
+            pass
+
+    we.processed = True
+    db.commit()
+
+    return Response(content=f"OK{inv_id}", media_type="text/plain")
+
+
+@router.get("/success/robokassa")
+@router.post("/success/robokassa")
+async def robokassa_success(request: Request):
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url=f"{settings.FRONTEND_URL}/subscribe/success?provider=robokassa")
+
+
+@router.get("/fail/robokassa")
+@router.post("/fail/robokassa")
+async def robokassa_fail(request: Request):
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url=f"{settings.FRONTEND_URL}/subscribe/cancel")
 
 
 @router.get("/status")
