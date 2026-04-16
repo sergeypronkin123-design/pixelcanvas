@@ -21,7 +21,7 @@ export function OfferPage() {
               <h2 className="font-display font-semibold text-lg text-canvas-bright mt-4">1. Общие положения</h2>
               <p>
                 Настоящая публичная оферта (далее — «Оферта») представляет собой официальное предложение
-                самозанятого Пронкина Сергея Николаевича (ИНН: 250202459700), действующего на основании
+                самозанятого Пронкина Сергея Александровича (ИНН: 250202459700), действующего на основании
                 свидетельства о постановке на учет в качестве плательщика налога на профессиональный доход
                 (далее — «Исполнитель»), любому дееспособному физическому лицу (далее — «Пользователь»)
                 заключить договор на использование платформы PixelStake на условиях, изложенных ниже.
@@ -100,7 +100,7 @@ export function OfferPage() {
               </p>
 
               <h2 className="font-display font-semibold text-lg text-canvas-bright mt-4">8. Контакты Исполнителя</h2>
-              <p>Пронкин Сергей Николаевич</p>
+              <p>Пронкин Сергей Александрович</p>
               <p>ИНН: 250202459700</p>
               <p>г. Владивосток</p>
               <p>Email: <a href="mailto:support@pixelstake.ru" className="text-orange-400 hover:underline">support@pixelstake.ru</a></p>
@@ -134,7 +134,7 @@ export function ContactsPage() {
                 </div>
                 <div className="flex flex-col sm:flex-row sm:justify-between gap-1 border-b border-canvas-border pb-3">
                   <span className="text-canvas-muted">ФИО</span>
-                  <span className="text-canvas-bright">Пронкин Сергей Николаевич</span>
+                  <span className="text-canvas-bright">Пронкин Сергей Александрович</span>
                 </div>
                 <div className="flex flex-col sm:flex-row sm:justify-between gap-1 border-b border-canvas-border pb-3">
                   <span className="text-canvas-muted">ИНН</span>
@@ -270,7 +270,7 @@ export function RefundPage() {
               <p>
                 По всем вопросам возврата: <a href="mailto:support@pixelstake.ru" className="text-orange-400 hover:underline">support@pixelstake.ru</a>
               </p>
-              <p>Самозанятый Пронкин Сергей Николаевич, ИНН: 250202459700</p>
+              <p>Самозанятый Пронкин Сергей Александрович, ИНН: 250202459700</p>
             </div>
           </motion.div>
         </div>
@@ -298,7 +298,7 @@ export function PrivacyPage() {
               <p>
                 Настоящая политика обработки персональных данных составлена в соответствии с Федеральным
                 законом от 27.07.2006 №152-ФЗ «О персональных данных» и определяет порядок обработки
-                персональных данных самозанятым Пронкиным Сергеем Николаевичем (ИНН: 250202459700),
+                персональных данных самозанятым Пронкиным Сергеем Александровичем (ИНН: 250202459700),
                 именуемым в дальнейшем «Оператор».
               </p>
 
@@ -358,7 +358,7 @@ export function PrivacyPage() {
               </p>
 
               <h2 className="font-display font-semibold text-lg text-canvas-bright mt-4">8. Контакты</h2>
-              <p>Оператор: Самозанятый Пронкин Сергей Николаевич</p>
+              <p>Оператор: Самозанятый Пронкин Сергей Александрович</p>
               <p>ИНН: 250202459700</p>
               <p>Email: <a href="mailto:support@pixelstake.ru" className="text-orange-400 hover:underline">support@pixelstake.ru</a></p>
             </div>

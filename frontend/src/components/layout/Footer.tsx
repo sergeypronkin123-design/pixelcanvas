@@ -25,7 +25,7 @@ export function Footer() {
         {/* Legal info — required by payment systems */}
         <div className="border-t border-canvas-border pt-4 text-xs text-canvas-muted space-y-1">
           <p>
-            Самозанятый <span className="text-canvas-text">Пронкин Сергей Николаевич</span>
+            Самозанятый <span className="text-canvas-text">Пронкин Сергей Александрович</span>
           </p>
           <p>
             ИНН: <span className="font-mono text-canvas-text">250202459700</span> · г. Владивосток
