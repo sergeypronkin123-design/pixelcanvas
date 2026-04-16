@@ -89,34 +89,23 @@ def create_subscription_checkout(
         return {"checkout_url": payment["confirmation"]["confirmation_url"], "session_id": payment["id"]}
 
     elif provider == "robokassa":
-        from app.services.robokassa import generate_payment_url
-
         # Создаём subscription запись чтобы получить inv_id
         sub = Subscription(
             user_id=user.id,
             provider="robokassa",
-            provider_session_id="",  # заполним после
+            provider_session_id="",
             amount=settings.SUB_PRICE_RUB,
             currency="RUB",
             status="pending",
         )
         db.add(sub)
         db.flush()
-
-        amount_rub = settings.SUB_PRICE_RUB / 100
-        url = generate_payment_url(
-            amount_rub=amount_rub,
-            inv_id=sub.id,
-            description="PixelStake Pro — подписка на 30 дней",
-            user_email=user.email,
-            item_name="PixelStake Pro (30 дней)",
-            metadata={"user_id": str(user.id), "type": "subscription"},
-            is_test=settings.ROBOKASSA_TEST_MODE,
-        )
-
-        sub.provider_session_id = str(sub.id)  # Robokassa использует InvId
+        sub.provider_session_id = str(sub.id)
         db.commit()
-        return {"checkout_url": url, "session_id": str(sub.id)}
+
+        # Возвращаем URL на наш endpoint который отдаст HTML-форму с POST
+        checkout_url = f"{settings.BACKEND_URL}/api/subscribe/robokassa/form/subscription/{sub.id}"
+        return {"checkout_url": checkout_url, "session_id": str(sub.id)}
 
 
 @router.post("/webhook/stripe")
@@ -284,6 +273,61 @@ async def robokassa_webhook(request: Request, db: Session = Depends(get_db)):
     db.commit()
 
     return Response(content=f"OK{inv_id}", media_type="text/plain")
+
+
+@router.get("/robokassa/form/subscription/{sub_id}")
+def robokassa_subscription_form(sub_id: int, db: Session = Depends(get_db)):
+    """Рендерит HTML-форму с POST для оплаты подписки через Robokassa"""
+    from app.services.robokassa import generate_payment_form
+    from fastapi.responses import HTMLResponse
+
+    sub = db.query(Subscription).filter(Subscription.id == sub_id).first()
+    if not sub:
+        raise HTTPException(404, "Subscription not found")
+
+    user = db.query(User).filter(User.id == sub.user_id).first()
+    if not user:
+        raise HTTPException(404, "User not found")
+
+    amount_rub = sub.amount / 100
+    html = generate_payment_form(
+        amount_rub=amount_rub,
+        inv_id=sub.id,
+        description="PixelStake Pro — подписка на 30 дней",
+        user_email=user.email,
+        item_name="PixelStake Pro (30 дней)",
+        metadata={"user_id": str(user.id), "type": "subscription"},
+        is_test=settings.ROBOKASSA_TEST_MODE,
+    )
+    return HTMLResponse(content=html)
+
+
+@router.get("/robokassa/form/clan_donation/{donation_id}")
+def robokassa_clan_donation_form(donation_id: int, db: Session = Depends(get_db)):
+    """Рендерит HTML-форму с POST для оплаты доната за создание клана"""
+    from app.services.robokassa import generate_payment_form
+    from app.models.clan import ClanDonation
+    from fastapi.responses import HTMLResponse
+
+    donation = db.query(ClanDonation).filter(ClanDonation.id == donation_id).first()
+    if not donation:
+        raise HTTPException(404, "Donation not found")
+
+    user = db.query(User).filter(User.id == donation.user_id).first()
+    if not user:
+        raise HTTPException(404, "User not found")
+
+    amount_rub = donation.amount / 100
+    html = generate_payment_form(
+        amount_rub=amount_rub,
+        inv_id=donation.id,
+        description="PixelStake — разблокировка создания клана",
+        user_email=user.email,
+        item_name="Разблокировка создания клана",
+        metadata={"user_id": str(user.id), "type": "clan_donation"},
+        is_test=settings.ROBOKASSA_TEST_MODE,
+    )
+    return HTMLResponse(content=html)
 
 
 @router.get("/success/robokassa")

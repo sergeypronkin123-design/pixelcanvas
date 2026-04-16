@@ -70,6 +70,7 @@ class ClanOut(BaseModel):
     members_count: int
     total_pixels_placed: int
     battles_won: int
+    invite_code: Optional[str] = None
     created_at: datetime
 
     class Config:
@@ -146,6 +147,7 @@ def create_clan(data: ClanCreate, user: User = Depends(get_current_user), db: Se
         is_open=data.is_open,
         max_members=data.max_members,
         members_count=1,
+        invite_code=uuid.uuid4().hex[:12],  # уникальный код для инвайт-ссылки
     )
     db.add(clan)
     db.flush()
@@ -225,6 +227,75 @@ def get_my_clan(user: User = Depends(get_current_user), db: Session = Depends(ge
             for m in members
         ],
     }
+
+
+@router.get("/invite/{invite_code}")
+def get_clan_by_invite(invite_code: str, db: Session = Depends(get_db)):
+    """Публичная инфа о клане по инвайт-коду (для превью ссылки)"""
+    clan = db.query(Clan).filter(Clan.invite_code == invite_code).first()
+    if not clan:
+        raise HTTPException(404, "Приглашение не найдено или устарело")
+
+    territory = db.query(Pixel).filter(Pixel.clan_id == clan.id).count()
+    leader = db.query(User).filter(User.id == clan.leader_id).first()
+
+    return {
+        "clan": ClanOut.model_validate(clan).model_dump(),
+        "leader_username": leader.username if leader else None,
+        "territory_pixels": territory,
+    }
+
+
+@router.post("/join-by-code/{invite_code}")
+def join_by_invite_code(invite_code: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Вступить в клан по инвайт-коду (работает даже для закрытых кланов)"""
+    clan = db.query(Clan).filter(Clan.invite_code == invite_code).first()
+    if not clan:
+        raise HTTPException(404, "Приглашение не найдено")
+
+    # Проверка — прошло ли 7 дней
+    now = datetime.now(timezone.utc)
+    if user.clan_id == clan.id:
+        raise HTTPException(400, "Вы уже в этом клане")
+
+    if user.clan_id:
+        if user.clan_join_available_at and user.clan_join_available_at > now:
+            days_left = (user.clan_join_available_at - now).days + 1
+            raise HTTPException(403, f"Сменить клан можно через {days_left} дней")
+
+    if clan.members_count >= clan.max_members:
+        raise HTTPException(400, "Клан переполнен")
+
+    # Выйти из старого клана
+    if user.clan_id:
+        old_clan = db.query(Clan).filter(Clan.id == user.clan_id).first()
+        if old_clan:
+            old_clan.members_count = max(0, (old_clan.members_count or 1) - 1)
+        db.query(ClanMember).filter(ClanMember.user_id == user.id).delete()
+
+    # Вступить
+    member = ClanMember(clan_id=clan.id, user_id=user.id, role="member")
+    db.add(member)
+    clan.members_count = (clan.members_count or 0) + 1
+    user.clan_id = clan.id
+    user.clan_role = "member"
+    user.clan_join_available_at = now + timedelta(days=CLAN_SWITCH_DAYS)
+    db.commit()
+    return {"status": "ok", "clan_id": clan.id}
+
+
+@router.post("/{clan_id}/regenerate-invite")
+def regenerate_invite_code(clan_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Сгенерировать новый инвайт-код (только лидер) — старая ссылка перестанет работать"""
+    clan = db.query(Clan).filter(Clan.id == clan_id).first()
+    if not clan:
+        raise HTTPException(404, "Клан не найден")
+    if clan.leader_id != user.id:
+        raise HTTPException(403, "Только лидер может менять инвайт-ссылку")
+
+    clan.invite_code = uuid.uuid4().hex[:12]
+    db.commit()
+    return {"invite_code": clan.invite_code}
 
 
 @router.get("/{clan_id}")
@@ -589,8 +660,6 @@ def donate_checkout(
         return {"checkout_url": payment["confirmation"]["confirmation_url"]}
 
     elif provider == "robokassa":
-        from app.services.robokassa import generate_payment_url
-
         donation = ClanDonation(
             user_id=user.id,
             amount=CLAN_CREATE_DONATION_RUB,
@@ -601,17 +670,9 @@ def donate_checkout(
         )
         db.add(donation)
         db.flush()
-
-        amount_rub = CLAN_CREATE_DONATION_RUB / 100
-        url = generate_payment_url(
-            amount_rub=amount_rub,
-            inv_id=donation.id,
-            description="PixelStake — разблокировка создания клана",
-            user_email=user.email,
-            item_name="Разблокировка создания клана",
-            metadata={"user_id": str(user.id), "type": "clan_donation"},
-            is_test=settings.ROBOKASSA_TEST_MODE,
-        )
         donation.provider_session_id = str(donation.id)
         db.commit()
-        return {"checkout_url": url}
+
+        # URL на наш endpoint, который отдаст HTML-форму с POST
+        checkout_url = f"{settings.BACKEND_URL}/api/subscribe/robokassa/form/clan_donation/{donation.id}"
+        return {"checkout_url": checkout_url}

@@ -1,14 +1,18 @@
 """
 Интеграция с Robokassa для приёма платежей.
 
-Документация: https://docs.robokassa.ru/
-Формат подписи: MD5(MerchantLogin:OutSum:InvId:Receipt:Password1)
+Документация: https://docs.robokassa.ru/ru/fiscalization/
+Формат подписи: MD5(MerchantLogin:OutSum:InvId:Receipt:Password1:Shp_*)
+
+ВАЖНО: Из-за размера Receipt используется POST-запрос (форма с автосабмитом).
+Перед добавлением в подпись значение Receipt НЕ кодируется (используется исходный JSON),
+но в теле формы должно быть URL-закодировано при GET.
 """
 import hashlib
 import json
 import logging
 from typing import Optional, Dict, Any
-from urllib.parse import urlencode
+from urllib.parse import quote
 
 from app.core.config import get_settings
 
@@ -28,10 +32,10 @@ def build_receipt(amount_rub: float, item_name: str, quantity: int = 1) -> dict:
     Налог: без_НДС (самозанятый не платит НДС).
     """
     return {
-        "sno": "npd",  # Налог на профессиональный доход (самозанятость)
+        "sno": "npd",
         "items": [
             {
-                "name": item_name,
+                "name": item_name[:128],  # до 128 символов
                 "quantity": quantity,
                 "sum": round(amount_rub * quantity, 2),
                 "tax": "none",
@@ -42,7 +46,7 @@ def build_receipt(amount_rub: float, item_name: str, quantity: int = 1) -> dict:
     }
 
 
-def generate_payment_url(
+def generate_payment_form(
     amount_rub: float,
     inv_id: int,
     description: str,
@@ -52,62 +56,115 @@ def generate_payment_url(
     is_test: bool = False,
 ) -> str:
     """
-    Генерирует URL для перехода на страницу оплаты Robokassa.
+    Генерирует HTML-форму с автосабмитом на страницу оплаты Robokassa.
+    Используется POST (т.к. Receipt может быть большим).
 
-    Args:
-        amount_rub: Сумма в рублях (например 199.00)
-        inv_id: Уникальный ID платежа (целое число, у нас id из таблицы Subscription)
-        description: Описание платежа
-        user_email: Email покупателя (для чека)
-        item_name: Название товара для чека
-        metadata: Дополнительные данные (сохраняются в Shp_* параметрах)
-        is_test: Тестовый режим (без реальных денег)
-
-    Returns:
-        URL для перенаправления пользователя на оплату
+    Возвращает готовый HTML — фронтенд получает его и вставляет на страницу.
+    Forma немедленно сабмитится через JavaScript.
     """
     merchant_login = settings.ROBOKASSA_MERCHANT_LOGIN
     password_1 = settings.ROBOKASSA_PASSWORD_1
 
     out_sum = f"{amount_rub:.2f}"
     receipt = build_receipt(amount_rub, item_name)
+    # Compact JSON без пробелов
     receipt_json = json.dumps(receipt, ensure_ascii=False, separators=(",", ":"))
+    # Для подписи: URL-кодированный Receipt
+    receipt_encoded = quote(receipt_json, safe="")
 
-    # Подпись: MerchantLogin:OutSum:InvId:Receipt:Password1
-    # + дополнительные пользовательские параметры (Shp_*) в алфавитном порядке
     shp_params = {}
     if metadata:
         for k, v in metadata.items():
             shp_params[f"Shp_{k}"] = str(v)
 
-    # В подписи пользовательские параметры добавляются в алфавитном порядке
+    # Подпись: MerchantLogin:OutSum:InvId:URL_ENCODED_Receipt:Password1:Shp_*
     shp_for_signature = ""
     for k in sorted(shp_params.keys()):
         shp_for_signature += f":{k}={shp_params[k]}"
 
-    sig_input = f"{merchant_login}:{out_sum}:{inv_id}:{receipt_json}:{password_1}{shp_for_signature}"
+    sig_input = f"{merchant_login}:{out_sum}:{inv_id}:{receipt_encoded}:{password_1}{shp_for_signature}"
     signature = _md5(sig_input)
 
-    params = {
+    # Сформировать скрытые поля формы
+    fields = {
         "MerchantLogin": merchant_login,
         "OutSum": out_sum,
         "InvId": str(inv_id),
         "Description": description,
-        "Receipt": receipt_json,
+        "Receipt": receipt_json,  # В теле формы — как есть, браузер закодирует
         "Email": user_email,
         "SignatureValue": signature,
         "Culture": "ru",
         "Encoding": "utf-8",
     }
-
     if is_test:
-        params["IsTest"] = "1"
+        fields["IsTest"] = "1"
+    fields.update(shp_params)
 
-    # Добавить Shp_* параметры
-    params.update(shp_params)
+    # HTML-форма с автосабмитом
+    inputs_html = "\n".join(
+        f'<input type="hidden" name="{k}" value="{_escape_html(v)}" />'
+        for k, v in fields.items()
+    )
 
-    url = ROBOKASSA_PAYMENT_URL + "?" + urlencode(params)
-    return url
+    html = f"""<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <title>Переход к оплате...</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body {{
+      background: #0f0f17;
+      color: #e5e5e5;
+      font-family: -apple-system, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+    }}
+    .loader {{
+      text-align: center;
+    }}
+    .spinner {{
+      width: 40px;
+      height: 40px;
+      border: 3px solid rgba(249, 115, 22, 0.3);
+      border-top-color: #f97316;
+      border-radius: 50%;
+      margin: 0 auto 20px;
+      animation: spin 0.8s linear infinite;
+    }}
+    @keyframes spin {{
+      to {{ transform: rotate(360deg); }}
+    }}
+  </style>
+</head>
+<body>
+  <div class="loader">
+    <div class="spinner"></div>
+    <p>Переходим к оплате...</p>
+  </div>
+  <form id="rk" method="POST" action="{ROBOKASSA_PAYMENT_URL}">
+    {inputs_html}
+  </form>
+  <script>document.getElementById('rk').submit();</script>
+</body>
+</html>"""
+
+    return html
+
+
+def _escape_html(value: str) -> str:
+    """Простое экранирование HTML для значений в атрибутах"""
+    return (
+        str(value)
+        .replace("&", "&amp;")
+        .replace('"', "&quot;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+    )
 
 
 def verify_payment_signature(
@@ -119,12 +176,6 @@ def verify_payment_signature(
     """
     Проверка подписи от Robokassa при получении уведомления (ResultURL).
     Формат: MD5(OutSum:InvId:Password2:Shp_*)
-
-    Args:
-        out_sum: Сумма из уведомления
-        inv_id: ID платежа
-        signature_value: Подпись от Robokassa
-        shp_params: Пользовательские параметры Shp_*
     """
     password_2 = settings.ROBOKASSA_PASSWORD_2
 

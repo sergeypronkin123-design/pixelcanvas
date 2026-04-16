@@ -16,6 +16,9 @@ class Clan(Base):
     max_members = Column(Integer, default=50)
     members_count = Column(Integer, default=1)
 
+    # Инвайт-ссылка
+    invite_code = Column(String(20), unique=True, nullable=True, index=True)
+
     # Статистика
     total_pixels_placed = Column(Integer, default=0)  # все пиксели за всё время
     battles_won = Column(Integer, default=0)

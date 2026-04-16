@@ -10,12 +10,22 @@ router = APIRouter(prefix="/admin", tags=["admin"])
 
 @router.get("/stats")
 def get_stats(admin=Depends(require_admin), db: Session = Depends(get_db)):
+    from app.models import ClanDonation, Clan
+    sub_rub = db.query(func.coalesce(func.sum(Subscription.amount), 0)).filter(Subscription.status == "paid", Subscription.currency == "RUB").scalar() or 0
+    sub_usd = db.query(func.coalesce(func.sum(Subscription.amount), 0)).filter(Subscription.status == "paid", Subscription.currency == "usd").scalar() or 0
+    clan_rub = db.query(func.coalesce(func.sum(ClanDonation.amount), 0)).filter(ClanDonation.status == "paid", ClanDonation.currency == "RUB").scalar() or 0
+    clan_usd = db.query(func.coalesce(func.sum(ClanDonation.amount), 0)).filter(ClanDonation.status == "paid", ClanDonation.currency == "usd").scalar() or 0
+
     return {
         "total_users": db.query(User).count(),
         "total_pixels": db.query(Pixel).count(),
         "total_subscribers": db.query(User).filter(User.is_subscriber == True).count(),
-        "total_revenue_usd": db.query(func.coalesce(func.sum(Subscription.amount), 0)).filter(Subscription.status == "paid", Subscription.currency == "usd").scalar(),
-        "total_revenue_rub": db.query(func.coalesce(func.sum(Subscription.amount), 0)).filter(Subscription.status == "paid", Subscription.currency == "RUB").scalar(),
+        "total_clans": db.query(Clan).count(),
+        "total_revenue_usd": sub_usd + clan_usd,
+        "total_revenue_rub": sub_rub + clan_rub,
+        "subscription_revenue_rub": sub_rub,
+        "clan_donations_revenue_rub": clan_rub,
+        "clan_donations_count": db.query(ClanDonation).filter(ClanDonation.status == "paid").count(),
         "active_battles": db.query(Battle).filter(Battle.is_active == True).count(),
     }
 
