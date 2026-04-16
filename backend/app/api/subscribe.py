@@ -302,6 +302,36 @@ def robokassa_subscription_form(sub_id: int, db: Session = Depends(get_db)):
     return HTMLResponse(content=html)
 
 
+@router.get("/robokassa/demo")
+def robokassa_demo_payment():
+    """
+    ПУБЛИЧНЫЙ endpoint для воспроизведения ошибки оплаты без авторизации.
+    Используется службой поддержки Robokassa для диагностики проблем.
+    
+    Прямая ссылка: https://pixelcanvas-api.onrender.com/api/subscribe/robokassa/demo
+    
+    Генерирует тестовый платёж на 199 ₽ с фиксированным InvId=999999 
+    чтобы показать где именно возникает ошибка.
+    """
+    from app.services.robokassa import generate_payment_form
+    from fastapi.responses import HTMLResponse
+    from datetime import datetime
+
+    # Уникальный InvId на основе времени (чтобы не дублировался)
+    demo_inv_id = int(datetime.now().timestamp()) % 10000000
+
+    html = generate_payment_form(
+        amount_rub=199.00,
+        inv_id=demo_inv_id,
+        description="PixelStake Pro — тест оплаты (демо для поддержки)",
+        user_email="support@pixelstake.ru",
+        item_name="PixelStake Pro (30 дней)",
+        metadata={"user_id": "0", "type": "demo"},
+        is_test=settings.ROBOKASSA_TEST_MODE,
+    )
+    return HTMLResponse(content=html)
+
+
 @router.get("/robokassa/form/clan_donation/{donation_id}")
 def robokassa_clan_donation_form(donation_id: int, db: Session = Depends(get_db)):
     """Рендерит HTML-форму с POST для оплаты доната за создание клана"""
