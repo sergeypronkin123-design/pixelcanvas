@@ -31,6 +31,7 @@ class ClanCreate(BaseModel):
     description: Optional[str] = Field(None, max_length=500)
     color: str = Field(pattern=r"^#[0-9a-fA-F]{6}$", default="#f97316")
     emoji: Optional[str] = Field(None, max_length=10)
+    emblem_code: Optional[str] = Field("shield", max_length=30)
     is_open: bool = True
     max_members: int = Field(50, ge=2, le=500)
 
@@ -53,6 +54,7 @@ class ClanUpdate(BaseModel):
     description: Optional[str] = Field(None, max_length=500)
     color: Optional[str] = Field(None, pattern=r"^#[0-9a-fA-F]{6}$")
     emoji: Optional[str] = Field(None, max_length=10)
+    emblem_code: Optional[str] = Field(None, max_length=30)
     is_open: Optional[bool] = None
     max_members: Optional[int] = Field(None, ge=2, le=500)
 
@@ -64,6 +66,7 @@ class ClanOut(BaseModel):
     description: Optional[str]
     color: str
     emoji: Optional[str]
+    emblem_code: Optional[str] = "shield"
     leader_id: int
     is_open: bool
     max_members: int
@@ -143,6 +146,7 @@ def create_clan(data: ClanCreate, user: User = Depends(get_current_user), db: Se
         description=data.description,
         color=data.color,
         emoji=data.emoji,
+        emblem_code=data.emblem_code or "shield",
         leader_id=user.id,
         is_open=data.is_open,
         max_members=data.max_members,
@@ -412,6 +416,8 @@ def update_clan(clan_id: int, data: ClanUpdate, user: User = Depends(get_current
         clan.color = data.color
     if data.emoji is not None:
         clan.emoji = data.emoji
+    if data.emblem_code is not None:
+        clan.emblem_code = data.emblem_code
     if data.is_open is not None:
         clan.is_open = data.is_open
     if data.max_members is not None:
@@ -473,6 +479,8 @@ def my_invites(user: User = Depends(get_current_user), db: Session = Depends(get
             "clan_name": i.Clan.name,
             "clan_tag": i.Clan.tag,
             "clan_emoji": i.Clan.emoji,
+            "clan_emblem_code": i.Clan.emblem_code or "shield",
+            "clan_color": i.Clan.color,
             "from_username": i.User.username,
             "created_at": i.ClanInvite.created_at.isoformat() if i.ClanInvite.created_at else None,
         }
@@ -574,6 +582,7 @@ def clan_leaderboard(limit: int = Query(30, le=100), db: Session = Depends(get_d
                 "name": clan.name,
                 "tag": clan.tag,
                 "emoji": clan.emoji,
+                "emblem_code": clan.emblem_code or "shield",
                 "color": clan.color,
                 "members_count": clan.members_count,
                 "territory_pixels": territory,

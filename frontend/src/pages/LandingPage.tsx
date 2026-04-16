@@ -5,6 +5,7 @@ import { Navbar } from '@/components/layout/Navbar';
 import { Footer } from '@/components/layout/Footer';
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
+import { RankIcon } from '@/components/icons/RankIcons';
 
 function InstallBanner() {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
@@ -160,19 +161,19 @@ export function LandingPage() {
           </motion.div>
           <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
             {[
-              { emoji: '🔰', name: 'Новичок', px: '0' },
-              { emoji: '⚔️', name: 'Боец', px: '10' },
-              { emoji: '🎨', name: 'Художник', px: '50' },
-              { emoji: '🖌️', name: 'Мастер', px: '100' },
-              { emoji: '🛡️', name: 'Воин', px: '250' },
-              { emoji: '🏆', name: 'Легенда', px: '500' },
-              { emoji: '👑', name: 'Бог', px: '1K' },
-              { emoji: '🔥', name: 'Император', px: '5K' },
-              { emoji: '🌍', name: 'Создатель', px: '10K' },
+              { tier: 0, name: 'Новичок', px: '0' },
+              { tier: 1, name: 'Боец', px: '10' },
+              { tier: 2, name: 'Художник', px: '50' },
+              { tier: 3, name: 'Мастер', px: '100' },
+              { tier: 4, name: 'Воин', px: '250' },
+              { tier: 5, name: 'Легенда', px: '500' },
+              { tier: 6, name: 'Бог', px: '1K' },
+              { tier: 7, name: 'Император', px: '5K' },
+              { tier: 8, name: 'Создатель', px: '10K' },
             ].map((r, i) => (
               <motion.div key={i} initial={{ y: 20, opacity: 0 }} whileInView={{ y: 0, opacity: 1 }} viewport={{ once: true }} transition={{ delay: i * 0.06 }}
                           className="card !p-3 text-center">
-                <div className="text-2xl mb-1">{r.emoji}</div>
+                <div className="flex justify-center mb-1"><RankIcon tier={r.tier} size={36} /></div>
                 <div className="text-xs font-display font-semibold text-canvas-bright">{r.name}</div>
                 <div className="text-xs font-mono text-canvas-muted">{r.px} px</div>
               </motion.div>

@@ -4,18 +4,19 @@ export interface Rank {
   minPixels: number;
   color: string;
   emoji: string;
+  tier: number; // 0-8 для RankIcon
 }
 
 export const RANKS: Rank[] = [
-  { name: 'Newbie', nameRu: 'Новичок', minPixels: 0, color: '#6b6b8a', emoji: '🔰' },
-  { name: 'Pixel Fighter', nameRu: 'Пиксельный боец', minPixels: 10, color: '#00ff88', emoji: '⚔️' },
-  { name: 'Artist', nameRu: 'Художник', minPixels: 50, color: '#00bfff', emoji: '🎨' },
-  { name: 'Brush Master', nameRu: 'Мастер кисти', minPixels: 100, color: '#8b5cf6', emoji: '🖌️' },
-  { name: 'Pixel Warrior', nameRu: 'Пиксельный воин', minPixels: 250, color: '#ff6600', emoji: '🛡️' },
-  { name: 'Canvas Legend', nameRu: 'Легенда холста', minPixels: 500, color: '#ff00aa', emoji: '🏆' },
-  { name: 'Pixel God', nameRu: 'Пиксельный бог', minPixels: 1000, color: '#ffaa00', emoji: '👑' },
-  { name: 'Pixel Emperor', nameRu: 'Император пикселей', minPixels: 5000, color: '#ff4444', emoji: '🔥' },
-  { name: 'World Creator', nameRu: 'Создатель миров', minPixels: 10000, color: '#00f0ff', emoji: '🌍' },
+  { name: 'Newbie', nameRu: 'Новичок', minPixels: 0, color: '#94a3b8', emoji: '🔰', tier: 0 },
+  { name: 'Pixel Fighter', nameRu: 'Пиксельный боец', minPixels: 10, color: '#fb923c', emoji: '⚔️', tier: 1 },
+  { name: 'Artist', nameRu: 'Художник', minPixels: 50, color: '#4ade80', emoji: '🎨', tier: 2 },
+  { name: 'Brush Master', nameRu: 'Мастер кисти', minPixels: 100, color: '#22d3ee', emoji: '🖌️', tier: 3 },
+  { name: 'Pixel Warrior', nameRu: 'Пиксельный воин', minPixels: 250, color: '#a78bfa', emoji: '🛡️', tier: 4 },
+  { name: 'Canvas Legend', nameRu: 'Легенда холста', minPixels: 500, color: '#f472b6', emoji: '🏆', tier: 5 },
+  { name: 'Pixel God', nameRu: 'Пиксельный бог', minPixels: 1000, color: '#facc15', emoji: '👑', tier: 6 },
+  { name: 'Pixel Emperor', nameRu: 'Император пикселей', minPixels: 5000, color: '#ef4444', emoji: '🔥', tier: 7 },
+  { name: 'World Creator', nameRu: 'Создатель миров', minPixels: 10000, color: '#f97316', emoji: '🌍', tier: 8 },
 ];
 
 export function getRank(pixels: number): Rank {

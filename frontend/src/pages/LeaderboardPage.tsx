@@ -3,8 +3,9 @@ import { Navbar } from '@/components/layout/Navbar';
 import { Footer } from '@/components/layout/Footer';
 import { useAuthStore } from '@/stores/authStore';
 import { motion } from 'framer-motion';
-import { Trophy, Crown, Crosshair, Medal } from 'lucide-react';
+import { Trophy, Crown, Crosshair } from 'lucide-react';
 import { getRank } from '@/lib/ranks';
+import { RankIcon, MedalIcon } from '@/components/icons/RankIcons';
 
 const API = import.meta.env.VITE_API_URL || '';
 async function fetchApi(path: string) {
@@ -33,13 +34,6 @@ export function LeaderboardPage() {
     if (user) fetchApi('/api/leaderboard/my-rank').then(setMyRank).catch(() => {});
   }, [user]);
 
-  const getMedalColor = (rank: number) => {
-    if (rank === 1) return 'text-yellow-400';
-    if (rank === 2) return 'text-gray-300';
-    if (rank === 3) return 'text-amber-600';
-    return 'text-canvas-muted';
-  };
-
   return (
     <div className="min-h-screen bg-canvas-bg flex flex-col"><Navbar />
       <main className="flex-1">
@@ -67,8 +61,8 @@ export function LeaderboardPage() {
                   </div>
                 </div>
                 <div className="text-right">
-                  <div className="text-sm" style={{ color: getRank(myRank.all_time_pixels).color }}>
-                    {getRank(myRank.all_time_pixels).emoji} {getRank(myRank.all_time_pixels).nameRu}
+                  <div className="text-sm flex items-center gap-1" style={{ color: getRank(myRank.all_time_pixels).color }}>
+                    <RankIcon tier={getRank(myRank.all_time_pixels).tier} size={14} /> {getRank(myRank.all_time_pixels).nameRu}
                   </div>
                   <div className="text-xs text-canvas-muted">из {myRank.total_players} игроков</div>
                 </div>
@@ -110,10 +104,9 @@ export function LeaderboardPage() {
                     className={`card !p-2 sm:!p-3 flex items-center gap-2 sm:gap-3 ${isMe ? 'border-orange-500/30 bg-orange-500/5' : ''}`}
                   >
                     {/* Rank number */}
-                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-display font-bold text-sm
-                      ${p.rank <= 3 ? 'bg-canvas-elevated' : ''}`}>
+                    <div className="w-8 h-8 rounded-lg flex items-center justify-center font-display font-bold text-sm">
                       {p.rank <= 3 ? (
-                        <Medal size={18} className={getMedalColor(p.rank)} />
+                        <MedalIcon place={p.rank as 1 | 2 | 3} size={28} />
                       ) : (
                         <span className="text-canvas-muted">{p.rank}</span>
                       )}
@@ -121,7 +114,7 @@ export function LeaderboardPage() {
 
                     {/* User info */}
                     <div className="flex-1 flex items-center gap-2">
-                      <span className="text-sm">{rank.emoji}</span>
+                      <span><RankIcon tier={rank.tier} size={16} /></span>
                       <span className="font-display font-semibold text-sm text-canvas-bright">{p.username}</span>
                       {p.is_subscriber && <Crown size={12} className="text-yellow-400" />}
                       {isMe && <span className="text-xs text-orange-400 font-display">(ты)</span>}

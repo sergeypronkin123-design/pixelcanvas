@@ -1,8 +1,9 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/stores/authStore';
-import { Crosshair, User, LogOut, Crown, Menu, X, Trophy, Share2, Shield, Coins, ShoppingBag } from 'lucide-react';
+import { User, LogOut, Crown, Menu, X, Trophy, Share2, Shield, ShoppingBag } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { LogoIcon, CoinIcon } from '@/components/icons/RankIcons';
 
 export function Navbar() {
   const { user, logout } = useAuthStore();
@@ -27,9 +28,7 @@ export function Navbar() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
         <div className="flex items-center justify-between h-14">
           <Link to="/" className="flex items-center gap-2 group">
-            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-orange-500 to-red-600 flex items-center justify-center">
-              <Crosshair size={15} className="text-white" />
-            </div>
+            <LogoIcon size={28} className="rounded-lg" />
             <span className="font-display font-bold text-base text-canvas-bright">
               Pixel<span className="text-orange-400">Stake</span>
             </span>
@@ -54,7 +53,7 @@ export function Navbar() {
               <>
                 {balance !== null && (
                   <Link to="/shop" className="px-2.5 py-1.5 text-sm bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 rounded-lg hover:bg-yellow-500/20 transition-all flex items-center gap-1">
-                    <Coins size={13} /> <span className="font-mono">{balance.toLocaleString()}</span>
+                    <CoinIcon size={14} /> <span className="font-mono">{balance.toLocaleString()}</span>
                   </Link>
                 )}
                 <Link to="/referral" className="px-3 py-1.5 text-sm text-neon-green/80 hover:text-neon-green hover:bg-canvas-elevated rounded-lg transition-all flex items-center gap-1">
@@ -95,7 +94,7 @@ export function Navbar() {
                     <span>Магазин</span>
                     {balance !== null && (
                       <span className="flex items-center gap-1 text-yellow-400 font-mono text-xs">
-                        <Coins size={11} /> {balance.toLocaleString()}
+                        <CoinIcon size={12} /> {balance.toLocaleString()}
                       </span>
                     )}
                   </Link>

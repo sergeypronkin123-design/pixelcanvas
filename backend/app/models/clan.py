@@ -10,6 +10,7 @@ class Clan(Base):
     description = Column(Text, nullable=True)
     color = Column(String(7), nullable=False, default="#f97316")  # цвет клана
     emoji = Column(String(10), nullable=True)
+    emblem_code = Column(String(30), nullable=True, default="shield")  # код SVG эмблемы: shield, sword, star и т.д.
 
     leader_id = Column(Integer, nullable=False, index=True)
     is_open = Column(Boolean, default=True)  # открытый или закрытый (по приглашениям)

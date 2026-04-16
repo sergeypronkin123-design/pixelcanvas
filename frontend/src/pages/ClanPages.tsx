@@ -8,6 +8,7 @@ import {
   Shield, Users, Crown, Search, Plus, Lock, Unlock,
   LogOut, UserPlus, UserX, Mail, CheckCircle, XCircle, Trophy, Crosshair
 } from 'lucide-react';
+import { ClanEmblem, CLAN_EMBLEMS, CLAN_EMBLEM_CODES } from '@/components/icons/ClanEmblems';
 
 const API = import.meta.env.VITE_API_URL || '';
 
@@ -73,9 +74,7 @@ export function ClansListPage() {
                     <Link key={c.clan_id} to={`/clans/${c.clan_id}`}
                       className="flex items-center gap-3 px-3 py-2 rounded-xl bg-canvas-elevated hover:bg-canvas-elevated/70 transition-all">
                       <span className="w-6 text-center text-sm font-display font-bold text-canvas-muted">{c.rank}</span>
-                      <div className="w-6 h-6 rounded-lg flex items-center justify-center text-xs" style={{ backgroundColor: c.color }}>
-                        {c.emoji || '⚔'}
-                      </div>
+                      <ClanEmblem code={c.emblem_code || "shield"} color={c.color} size={24} />
                       <div className="flex-1 min-w-0">
                         <div className="text-sm font-display font-semibold text-canvas-bright truncate">
                           [{c.tag}] {c.name}
@@ -116,9 +115,8 @@ export function ClansListPage() {
                 {clans.map((c) => (
                   <Link key={c.id} to={`/clans/${c.id}`}
                     className="card !p-3 flex items-center gap-3 hover:border-orange-500/30 transition-all">
-                    <div className="w-10 h-10 rounded-xl flex items-center justify-center text-lg flex-shrink-0"
-                      style={{ backgroundColor: c.color }}>
-                      {c.emoji || '⚔'}
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 bg-canvas-bg border border-canvas-border">
+                      <ClanEmblem code={c.emblem_code || "shield"} color={c.color} size={32} />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="font-display font-semibold text-canvas-bright truncate flex items-center gap-2">
@@ -158,7 +156,7 @@ export function CreateClanPage() {
   const [tag, setTag] = useState('');
   const [description, setDescription] = useState('');
   const [color, setColor] = useState('#f97316');
-  const [emoji, setEmoji] = useState('⚔️');
+  const [emblemCode, setEmblemCode] = useState('shield');
   const [isOpen, setIsOpen] = useState(true);
   const [maxMembers, setMaxMembers] = useState(50);
 
@@ -172,7 +170,7 @@ export function CreateClanPage() {
     try {
       await fetchApi('/api/clans/create', {
         method: 'POST',
-        body: JSON.stringify({ name, tag, description, color, emoji, is_open: isOpen, max_members: maxMembers }),
+        body: JSON.stringify({ name, tag, description, color, emblem_code: emblemCode, is_open: isOpen, max_members: maxMembers }),
       });
       // Перезагрузить user чтобы clan_id обновился в store
       await useAuthStore.getState().loadUser();
@@ -289,11 +287,31 @@ export function CreateClanPage() {
                       className="input-field font-mono flex-1" maxLength={7} />
                   </div>
                 </div>
-                <div>
-                  <label className="label-text">Эмодзи</label>
-                  <input type="text" value={emoji} onChange={(e) => setEmoji(e.target.value)}
-                    className="input-field text-2xl" maxLength={4} placeholder="⚔️" />
+              </div>
+
+              <div>
+                <label className="label-text">Эмблема клана</label>
+                <div className="grid grid-cols-6 gap-2 mt-1">
+                  {CLAN_EMBLEM_CODES.map((code) => (
+                    <button
+                      key={code}
+                      type="button"
+                      onClick={() => setEmblemCode(code)}
+                      className={`aspect-square rounded-xl flex items-center justify-center transition-all ${
+                        emblemCode === code
+                          ? 'bg-canvas-elevated border-2 scale-110'
+                          : 'bg-canvas-bg border border-canvas-border hover:border-canvas-muted'
+                      }`}
+                      style={emblemCode === code ? { borderColor: color } : {}}
+                      title={CLAN_EMBLEMS[code].name}
+                    >
+                      <ClanEmblem code={code} color={color} size={32} />
+                    </button>
+                  ))}
                 </div>
+                <p className="text-xs text-canvas-muted mt-1.5">
+                  Выбрано: <span className="text-canvas-bright">{CLAN_EMBLEMS[emblemCode]?.name || 'Щит'}</span>
+                </p>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -409,7 +427,7 @@ export function MyClanPage() {
                 <div className="space-y-2">
                   {invites.map((i) => (
                     <div key={i.invite_id} className="flex items-center gap-3 p-3 rounded-xl bg-canvas-elevated">
-                      <span className="text-lg">{i.clan_emoji || '⚔'}</span>
+                      <ClanEmblem code={i.clan_emblem_code || "shield"} color={i.clan_color || "#f97316"} size={24} />
                       <div className="flex-1 min-w-0">
                         <div className="font-display font-semibold text-sm text-canvas-bright truncate">
                           [{i.clan_tag}] {i.clan_name}
@@ -447,9 +465,8 @@ export function MyClanPage() {
             {/* Header */}
             <div className="card mb-4">
               <div className="flex items-center gap-4">
-                <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl flex-shrink-0"
-                  style={{ backgroundColor: c.color }}>
-                  {c.emoji || '⚔'}
+                <div className="w-16 h-16 rounded-2xl flex items-center justify-center flex-shrink-0 bg-canvas-bg border border-canvas-border">
+                  <ClanEmblem code={c.emblem_code || "shield"} color={c.color} size={48} />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
@@ -607,9 +624,8 @@ export function ClanDetailPage() {
           <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }}>
             <div className="card">
               <div className="flex items-center gap-4 mb-4">
-                <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl"
-                  style={{ backgroundColor: c.color }}>
-                  {c.emoji || '⚔'}
+                <div className="w-16 h-16 rounded-2xl flex items-center justify-center bg-canvas-bg border border-canvas-border">
+                  <ClanEmblem code={c.emblem_code || "shield"} color={c.color} size={48} />
                 </div>
                 <div className="flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
@@ -736,9 +752,8 @@ export function ClanInvitePage() {
                 <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-orange-500/10 border border-orange-500/30 text-xs font-display font-bold text-orange-400 mb-4">
                   <Mail size={11} /> ПРИГЛАШЕНИЕ В КЛАН
                 </div>
-                <div className="w-20 h-20 mx-auto rounded-2xl flex items-center justify-center text-4xl mb-3"
-                  style={{ backgroundColor: c.color }}>
-                  {c.emoji || '⚔'}
+                <div className="w-20 h-20 mx-auto rounded-2xl flex items-center justify-center bg-canvas-bg border border-canvas-border mb-3">
+                  <ClanEmblem code={c.emblem_code || "shield"} color={c.color} size={60} />
                 </div>
                 <div className="flex items-center justify-center gap-2 flex-wrap">
                   <span className="text-orange-400 font-mono font-bold">[{c.tag}]</span>

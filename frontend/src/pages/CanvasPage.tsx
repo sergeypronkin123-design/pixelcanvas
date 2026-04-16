@@ -6,6 +6,7 @@ import { useWebSocket } from '@/hooks/useWebSocket';
 import { api } from '@/lib/api';
 import { getRank } from '@/lib/ranks';
 import { Users, Clock, Swords, Crown, Lock } from 'lucide-react';
+import { RankIcon } from '@/components/icons/RankIcons';
 import { Link } from 'react-router-dom';
 
 export function CanvasPage() {
@@ -82,7 +83,7 @@ export function CanvasPage() {
         <div className="flex items-center gap-1.5 sm:gap-3 flex-shrink-0">
           {user && (
             <Link to="/profile" className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-canvas-elevated border border-canvas-border">
-              <span className="text-[10px]">{rank.emoji}</span>
+              <RankIcon tier={rank.tier} size={14} />
               <span className="font-mono text-canvas-muted">{totalPixels}</span>
             </Link>
           )}

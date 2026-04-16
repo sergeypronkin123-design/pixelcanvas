@@ -3,9 +3,11 @@ import { useAuthStore } from '@/stores/authStore';
 import { Navbar } from '@/components/layout/Navbar';
 import { Footer } from '@/components/layout/Footer';
 import { motion } from 'framer-motion';
-import { User, Crown, Crosshair, Calendar, TrendingUp, Shield, Coins, Trophy } from 'lucide-react';
+import { User, Crown, Crosshair, Calendar, TrendingUp, Shield } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { getRank, getNextRank, getProgress, RANKS } from '@/lib/ranks';
+import { RankIcon, CoinIcon } from '@/components/icons/RankIcons';
+import { ClanEmblem } from '@/components/icons/ClanEmblems';
 
 const API = import.meta.env.VITE_API_URL || '';
 
@@ -54,8 +56,8 @@ export function ProfilePage() {
           {/* Profile header */}
           <div className="card mb-6">
             <div className="flex items-center gap-5">
-              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-orange-500 to-red-600 flex items-center justify-center text-2xl">
-                {rank.emoji}
+              <div className="w-16 h-16 rounded-2xl bg-canvas-bg flex items-center justify-center overflow-hidden">
+                <RankIcon tier={rank.tier} size={56} />
               </div>
               <div className="flex-1">
                 <div className="flex items-center gap-2 flex-wrap">
@@ -67,7 +69,7 @@ export function ProfilePage() {
                   )}
                 </div>
                 <div className="flex items-center gap-2 mt-1">
-                  <span className="text-sm font-display font-semibold" style={{ color: rank.color }}>{rank.emoji} {rank.nameRu}</span>
+                  <span className="text-sm font-display font-semibold" style={{ color: rank.color }}>{rank.nameRu}</span>
                 </div>
                 <p className="text-canvas-muted text-xs mt-0.5">{user.email}</p>
               </div>
@@ -86,9 +88,13 @@ export function ProfilePage() {
             {/* Current rank bar */}
             <div className="mb-2">
               <div className="flex items-center justify-between text-xs mb-1">
-                <span style={{ color: rank.color }}>{rank.emoji} {rank.nameRu}</span>
+                <span className="flex items-center gap-1" style={{ color: rank.color }}>
+                  <RankIcon tier={rank.tier} size={14} /> {rank.nameRu}
+                </span>
                 {nextRank ? (
-                  <span className="text-canvas-muted">{nextRank.emoji} {nextRank.nameRu} ({nextRank.minPixels})</span>
+                  <span className="text-canvas-muted flex items-center gap-1">
+                    <RankIcon tier={nextRank.tier} size={14} /> {nextRank.nameRu} ({nextRank.minPixels})
+                  </span>
                 ) : (
                   <span className="text-neon-cyan">Максимальный ранг!</span>
                 )}
@@ -114,9 +120,8 @@ export function ProfilePage() {
           {clan && (
             <Link to="/clans/my" className="card mb-6 block hover:border-orange-500/40 transition-all">
               <div className="flex items-center gap-4">
-                <div className="w-14 h-14 rounded-xl flex items-center justify-center text-2xl flex-shrink-0"
-                  style={{ backgroundColor: clan.color }}>
-                  {clan.emoji || '⚔'}
+                <div className="w-14 h-14 rounded-xl flex items-center justify-center flex-shrink-0 bg-canvas-bg border border-canvas-border">
+                  <ClanEmblem code={clan.emblem_code || "shield"} color={clan.color} size={40} />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
@@ -150,7 +155,7 @@ export function ProfilePage() {
               <div className="text-xs text-canvas-muted">Пикселей</div>
             </div>
             <div className="card !p-4 text-center">
-              <Coins size={18} className="text-yellow-400 mx-auto mb-2" />
+              <div className="flex justify-center mb-2"><CoinIcon size={20} /></div>
               <div className="text-xl font-display font-bold text-canvas-bright">
                 {balance !== null ? balance.toLocaleString() : '...'}
               </div>
@@ -177,7 +182,7 @@ export function ProfilePage() {
                 return (
                   <div key={r.minPixels} className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-all
                     ${unlocked ? 'bg-canvas-elevated' : 'opacity-40'}`}>
-                    <span className="text-lg w-8 text-center">{r.emoji}</span>
+                    <RankIcon tier={r.tier} size={24} />
                     <div className="flex-1">
                       <span className="text-sm font-display font-semibold" style={{ color: unlocked ? r.color : '#6b6b8a' }}>
                         {r.nameRu}
