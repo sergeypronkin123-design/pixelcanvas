@@ -161,6 +161,18 @@ def place_pixel(data: PlacePixelRequest, user: User = Depends(get_current_user),
 
     db.commit()
 
+    # Award PixelCoin + check achievements
+    try:
+        from app.services import economy
+        economy.add_coins(db, user.id, economy.COIN_PER_PIXEL, "pixel_placed",
+                          {"x": data.x, "y": data.y})
+        db.commit()
+        # Achievements check (every 10 pixels to reduce load)
+        if (user.pixels_placed_total or 0) % 10 == 0 or (user.pixels_placed_total or 0) < 10:
+            economy.check_achievements_for_user(db, user.id)
+    except Exception as e:
+        logger.error(f"Economy update error: {e}")
+
     # Update canvas cache
     try:
         from app.services.canvas_cache import canvas_cache

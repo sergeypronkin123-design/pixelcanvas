@@ -1,14 +1,26 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/stores/authStore';
-import { Crosshair, User, LogOut, Crown, Menu, X, Trophy, Share2, Shield } from 'lucide-react';
-import { useState } from 'react';
+import { Crosshair, User, LogOut, Crown, Menu, X, Trophy, Share2, Shield, Coins, ShoppingBag } from 'lucide-react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export function Navbar() {
   const { user, logout } = useAuthStore();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
+  const [balance, setBalance] = useState<number | null>(null);
   const handleLogout = () => { logout(); navigate('/'); };
+
+  useEffect(() => {
+    if (!user) { setBalance(null); return; }
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    const API = import.meta.env.VITE_API_URL || '';
+    fetch(`${API}/api/economy/balance`, { headers: { Authorization: `Bearer ${token}` } })
+      .then((r) => r.ok ? r.json() : null)
+      .then((d) => { if (d) setBalance(d.balance); })
+      .catch(() => {});
+  }, [user]);
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 glass">
@@ -30,11 +42,21 @@ export function Navbar() {
             <Link to="/clans" className="px-3 py-1.5 text-sm text-canvas-muted hover:text-canvas-bright hover:bg-canvas-elevated rounded-lg transition-all flex items-center gap-1">
               <Shield size={13} /> Кланы
             </Link>
+            {user && (
+              <Link to="/shop" className="px-3 py-1.5 text-sm text-canvas-muted hover:text-canvas-bright hover:bg-canvas-elevated rounded-lg transition-all flex items-center gap-1">
+                <ShoppingBag size={13} /> Магазин
+              </Link>
+            )}
             <Link to="/subscribe" className="px-3 py-1.5 text-sm text-orange-400/80 hover:text-orange-400 hover:bg-canvas-elevated rounded-lg transition-all flex items-center gap-1">
               <Crown size={13} /> Pro
             </Link>
             {user ? (
               <>
+                {balance !== null && (
+                  <Link to="/shop" className="px-2.5 py-1.5 text-sm bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 rounded-lg hover:bg-yellow-500/20 transition-all flex items-center gap-1">
+                    <Coins size={13} /> <span className="font-mono">{balance.toLocaleString()}</span>
+                  </Link>
+                )}
                 <Link to="/referral" className="px-3 py-1.5 text-sm text-neon-green/80 hover:text-neon-green hover:bg-canvas-elevated rounded-lg transition-all flex items-center gap-1">
                   <Share2 size={13} /> Друзья
                 </Link>
@@ -67,6 +89,19 @@ export function Navbar() {
               <Link to="/canvas" onClick={() => setOpen(false)} className="block px-3 py-2 text-sm text-canvas-muted rounded-lg">Battle</Link>
               <Link to="/leaderboard" onClick={() => setOpen(false)} className="block px-3 py-2 text-sm text-canvas-muted rounded-lg">Топ игроков</Link>
               <Link to="/clans" onClick={() => setOpen(false)} className="block px-3 py-2 text-sm text-canvas-muted rounded-lg">Кланы</Link>
+              {user && (
+                <>
+                  <Link to="/shop" onClick={() => setOpen(false)} className="flex items-center justify-between px-3 py-2 text-sm text-canvas-bright rounded-lg">
+                    <span>Магазин</span>
+                    {balance !== null && (
+                      <span className="flex items-center gap-1 text-yellow-400 font-mono text-xs">
+                        <Coins size={11} /> {balance.toLocaleString()}
+                      </span>
+                    )}
+                  </Link>
+                  <Link to="/achievements" onClick={() => setOpen(false)} className="block px-3 py-2 text-sm text-canvas-muted rounded-lg">Достижения</Link>
+                </>
+              )}
               <Link to="/subscribe" onClick={() => setOpen(false)} className="block px-3 py-2 text-sm text-orange-400 rounded-lg">Pro</Link>
               {user ? (
                 <>

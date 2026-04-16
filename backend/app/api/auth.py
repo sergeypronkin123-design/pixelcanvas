@@ -92,6 +92,16 @@ def register(data: UserRegister, db: Session = Depends(get_db)):
             db.add(ref_record)
             db.commit()
 
+            # Award PixelCoin to referrer
+            try:
+                from app.services import economy
+                economy.add_coins(db, referrer.id, economy.COIN_REFERRAL_SIGNUP, "referral_signup",
+                                  {"referred_user_id": user.id})
+                db.commit()
+                economy.check_achievements_for_user(db, referrer.id)
+            except Exception:
+                pass
+
     token = create_access_token({"sub": str(user.id)})
     return TokenResponse(access_token=token, user=UserOut.model_validate(user))
 

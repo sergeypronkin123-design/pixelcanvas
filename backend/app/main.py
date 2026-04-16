@@ -11,6 +11,7 @@ from app.api import auth, pixels, subscribe, admin, ws
 from app.api import leaderboard as leaderboard_api
 from app.api import referral as referral_api
 from app.api import clans as clans_api
+from app.api import economy as economy_api
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -41,6 +42,12 @@ async def lifespan(app: FastAPI):
         # Preload canvas cache
         from app.services.canvas_cache import canvas_cache
         canvas_cache.load_from_db(db)
+
+        # Seed economy data
+        from app.services import economy
+        economy.seed_achievements(db)
+        economy.seed_shop(db)
+        logger.info("Economy seeded (achievements + shop items)")
     finally:
         db.close()
 
@@ -64,6 +71,7 @@ app.include_router(admin.router, prefix="/api")
 app.include_router(leaderboard_api.router, prefix="/api")
 app.include_router(referral_api.router, prefix="/api")
 app.include_router(clans_api.router, prefix="/api")
+app.include_router(economy_api.router, prefix="/api")
 app.include_router(ws.router)
 
 

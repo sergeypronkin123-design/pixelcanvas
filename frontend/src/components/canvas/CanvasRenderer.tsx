@@ -2,13 +2,19 @@ import { useRef, useEffect, useCallback, useState } from 'react';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
 
-const PALETTE = [
+const DEFAULT_PALETTE = [
   '#FF0000','#FF4500','#FF8C00','#FFD700','#FFFF00',
   '#7CFC00','#00FF00','#00FA9A','#00FFFF','#00BFFF',
   '#0000FF','#4B0082','#8B00FF','#FF00FF','#FF1493',
   '#FFFFFF','#C0C0C0','#808080','#404040','#000000',
   '#8B4513','#D2691E','#F4A460','#FFE4C4','#FFC0CB',
 ];
+
+interface PaletteGroup {
+  code: string;
+  name: string;
+  colors: string[];
+}
 
 function hexToRgb(hex: string): [number, number, number] {
   const v = parseInt(hex.slice(1), 16);
@@ -31,6 +37,29 @@ export function CanvasRenderer({ battleActive, onPixelPlaced, pixelUpdates }: Pr
   const [selectedColor, setSelectedColor] = useState('#FF0000');
   const [cooldownRemaining, setCooldownRemaining] = useState(0);
   const [hoverPos, setHoverPos] = useState<{ x: number; y: number } | null>(null);
+  const [palettes, setPalettes] = useState<PaletteGroup[]>([
+    { code: 'default', name: 'Базовая', colors: DEFAULT_PALETTE },
+  ]);
+  const [activePaletteCode, setActivePaletteCode] = useState<string>('default');
+
+  // Load user's palettes (default + unlocked from shop)
+  useEffect(() => {
+    if (!user) return;
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    const API = import.meta.env.VITE_API_URL || '';
+    fetch(`${API}/api/economy/palettes`, { headers: { Authorization: `Bearer ${token}` } })
+      .then((r) => r.ok ? r.json() : null)
+      .then((d) => {
+        if (d?.palettes?.length) {
+          setPalettes([
+            { code: 'default', name: 'Базовая', colors: DEFAULT_PALETTE },
+            ...d.palettes.filter((p: any) => p.code !== 'standard'),
+          ]);
+        }
+      })
+      .catch(() => {});
+  }, [user]);
 
   // Offscreen bitmap: 1000x1000 RGBA
   const bitmapRef = useRef<ImageData | null>(null);
@@ -378,8 +407,26 @@ export function CanvasRenderer({ battleActive, onPixelPlaced, pixelUpdates }: Pr
         {/* Expanded palette */}
         {paletteOpen && (
           <div className="glass rounded-2xl px-3 py-2 w-fit max-w-[95vw]">
+            {/* Palette tabs (only if user has more than default) */}
+            {palettes.length > 1 && (
+              <div className="flex gap-1 mb-2 overflow-x-auto">
+                {palettes.map((p) => (
+                  <button
+                    key={p.code}
+                    onClick={() => setActivePaletteCode(p.code)}
+                    className={`px-2 py-1 text-[10px] font-display rounded-md whitespace-nowrap transition-all ${
+                      activePaletteCode === p.code
+                        ? 'bg-orange-500/20 text-orange-400 border border-orange-500/40'
+                        : 'bg-canvas-elevated text-canvas-muted hover:text-canvas-bright border border-transparent'
+                    }`}
+                  >
+                    {p.name}
+                  </button>
+                ))}
+              </div>
+            )}
             <div className="grid grid-cols-10 gap-1">
-              {PALETTE.map((c) => (
+              {(palettes.find((p) => p.code === activePaletteCode)?.colors || DEFAULT_PALETTE).map((c) => (
                 <button key={c} onClick={() => { setSelectedColor(c); setPaletteOpen(false); }}
                   className={`w-7 h-7 sm:w-6 sm:h-6 rounded border-2 transition-all ${selectedColor === c ? 'border-white scale-110 shadow-[0_0_8px_rgba(255,255,255,0.4)]' : 'border-transparent'}`}
                   style={{ backgroundColor: c }} />
