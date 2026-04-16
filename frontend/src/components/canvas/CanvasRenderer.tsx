@@ -55,6 +55,28 @@ export function CanvasRenderer({ battleActive, onPixelPlaced, pixelUpdates }: Pr
     ctx.fillStyle = '#1a1a24';
     ctx.fillRect(0, 0, W, H);
     bitmapRef.current = ctx.getImageData(0, 0, W, H);
+
+    // Единоразовая загрузка всего холста через бинарный endpoint (в 10 раз быстрее)
+    api.getCanvasBinary().then((pixels) => {
+      const bmp = bitmapRef.current;
+      const off = offscreenRef.current;
+      if (!bmp || !off) return;
+      for (const p of pixels) {
+        if (p.x < 0 || p.x >= W || p.y < 0 || p.y >= H) continue;
+        const [r, g, b] = hexToRgb(p.color);
+        const i = (p.y * W + p.x) * 4;
+        bmp.data[i] = r; bmp.data[i+1] = g; bmp.data[i+2] = b; bmp.data[i+3] = 255;
+      }
+      off.getContext('2d')!.putImageData(bmp, 0, 0);
+      // Пометить все регионы как загруженные чтобы не делать дополнительных запросов
+      for (let gx = 0; gx < 10; gx++) {
+        for (let gy = 0; gy < 10; gy++) {
+          loadedRegions.current.add(`${gx},${gy},${gx+1},${gy+1}`);
+        }
+      }
+    }).catch(() => {
+      // Fallback: если бинарный endpoint не работает, старая логика сработает через loadViewport
+    });
   }, []);
 
   // Apply websocket pixel updates instantly to bitmap

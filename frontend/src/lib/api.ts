@@ -35,6 +35,27 @@ export const api = {
   getBattleStatus: () => request<any>('/api/pixels/status'),
   getCanvas: (xMin: number, yMin: number, xMax: number, yMax: number) =>
     request<any>(`/api/pixels/canvas?x_min=${xMin}&y_min=${yMin}&x_max=${xMax}&y_max=${yMax}`),
+  getCanvasBinary: async (): Promise<{ x: number; y: number; color: string }[]> => {
+    const API = import.meta.env.VITE_API_URL || '';
+    const res = await fetch(`${API}/api/pixels/canvas/binary`);
+    if (!res.ok) throw new Error('Failed to load canvas');
+    const buf = await res.arrayBuffer();
+    const view = new DataView(buf);
+    const count = view.getUint32(0, true);
+    const pixels: { x: number; y: number; color: string }[] = [];
+    let offset = 4;
+    for (let i = 0; i < count; i++) {
+      const x = view.getUint16(offset, true);
+      const y = view.getUint16(offset + 2, true);
+      const r = view.getUint8(offset + 4);
+      const g = view.getUint8(offset + 5);
+      const b = view.getUint8(offset + 6);
+      const color = '#' + ((r << 16) | (g << 8) | b).toString(16).padStart(6, '0');
+      pixels.push({ x, y, color });
+      offset += 7;
+    }
+    return pixels;
+  },
   placePixel: (x: number, y: number, color: string) =>
     request<any>('/api/pixels/place', { method: 'POST', body: JSON.stringify({ x, y, color }) }),
   getCooldown: () => request<any>('/api/pixels/cooldown'),

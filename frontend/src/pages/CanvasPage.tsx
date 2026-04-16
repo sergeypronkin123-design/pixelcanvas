@@ -25,6 +25,9 @@ export function CanvasPage() {
   const handleWS = useCallback((msg: any) => {
     if (msg.type === 'online_count') setOnlineCount(msg.count);
     else if (msg.type === 'pixel') setPixelUpdates((prev) => [...prev, { x: msg.x, y: msg.y, color: msg.color }]);
+    else if (msg.type === 'pixels_batch' && Array.isArray(msg.pixels)) {
+      setPixelUpdates((prev) => [...prev, ...msg.pixels.map((p: any) => ({ x: p.x, y: p.y, color: p.color }))]);
+    }
   }, []);
   useWebSocket(handleWS);
 

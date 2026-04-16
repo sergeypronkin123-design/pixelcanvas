@@ -56,13 +56,32 @@ def get_canvas(
     y_max: int = Query(1000),
     db: Session = Depends(get_db),
 ):
-    pixels = db.query(Pixel).filter(
-        Pixel.x >= x_min, Pixel.y >= y_min,
-        Pixel.x < x_max, Pixel.y < y_max,
-    ).all()
-    return {
-        "pixels": [{"x": p.x, "y": p.y, "color": p.color, "user_id": p.user_id} for p in pixels],
-    }
+    """JSON формат (для обратной совместимости)"""
+    from app.services.canvas_cache import canvas_cache
+    # Если кэш пустой — загрузить из БД
+    if canvas_cache.size() == 0:
+        canvas_cache.load_from_db(db)
+
+    # Отфильтровать по viewport
+    all_pixels = canvas_cache.get_all_pixels_json()
+    if x_min > 0 or y_min > 0 or x_max < 1000 or y_max < 1000:
+        all_pixels = [p for p in all_pixels if x_min <= p["x"] < x_max and y_min <= p["y"] < y_max]
+    return {"pixels": all_pixels}
+
+
+@router.get("/canvas/binary")
+def get_canvas_binary(db: Session = Depends(get_db)):
+    """Бинарный формат — в 10 раз меньше JSON, быстрее загружается"""
+    from app.services.canvas_cache import canvas_cache
+    from fastapi.responses import Response
+    if canvas_cache.size() == 0:
+        canvas_cache.load_from_db(db)
+    binary = canvas_cache.get_binary()
+    return Response(
+        content=binary,
+        media_type="application/octet-stream",
+        headers={"Cache-Control": "public, max-age=1"}  # CDN кэш 1 секунда
+    )
 
 
 @router.post("/place")
@@ -142,17 +161,20 @@ def place_pixel(data: PlacePixelRequest, user: User = Depends(get_current_user),
 
     db.commit()
 
-    # Broadcast
+    # Update canvas cache
+    try:
+        from app.services.canvas_cache import canvas_cache
+        canvas_cache.set_pixel(data.x, data.y, data.color, user.id, user.clan_id)
+    except Exception as e:
+        logger.error(f"Canvas cache update error: {e}")
+
+    # Broadcast (batched)
     try:
         loop = asyncio.get_event_loop()
         if loop.is_running():
-            asyncio.ensure_future(manager.broadcast({
-                "type": "pixel",
-                "x": data.x, "y": data.y,
-                "color": data.color,
-                "user_id": user.id,
-                "username": user.username,
-            }))
+            asyncio.ensure_future(manager.broadcast_pixel(
+                data.x, data.y, data.color, user.id, user.clan_id
+            ))
     except Exception as e:
         logger.error(f"Broadcast error: {e}")
 

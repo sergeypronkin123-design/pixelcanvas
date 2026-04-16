@@ -37,6 +37,10 @@ async def lifespan(app: FastAPI):
             db.add(admin)
             db.commit()
             logger.info("Admin user created")
+
+        # Preload canvas cache
+        from app.services.canvas_cache import canvas_cache
+        canvas_cache.load_from_db(db)
     finally:
         db.close()
 
