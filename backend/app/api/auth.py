@@ -44,6 +44,8 @@ class UserOut(BaseModel):
     bonus_pixels: int
     clan_id: int | None
     clan_role: str | None
+    onboarding_completed: bool = False
+    daily_streak: int = 0
     created_at: datetime
 
     class Config:

@@ -6,6 +6,7 @@ interface User {
   is_subscriber: boolean; subscription_until: string | null;
   pixels_placed_total: number; referral_code: string | null;
   bonus_pixels: number; clan_id: number | null; clan_role: string | null;
+  onboarding_completed: boolean; daily_streak: number;
   created_at: string;
 }
 
