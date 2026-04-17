@@ -19,7 +19,7 @@ async function fetchApi(path: string) {
 export function LeaderboardPage() {
   const user = useAuthStore((s) => s.user);
   const [players, setPlayers] = useState<any[]>([]);
-  const [period, setPeriod] = useState<'all' | 'battle'>('battle');
+  const [period, setPeriod] = useState<'all' | 'battle' | 'clan'>('battle');
   const [myRank, setMyRank] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
@@ -73,13 +73,22 @@ export function LeaderboardPage() {
           {/* Period toggle */}
           <div className="flex gap-1 mb-6 bg-canvas-surface rounded-xl p-1 border border-canvas-border w-fit mx-auto">
             <button onClick={() => setPeriod('battle')}
-              className={`px-5 py-2 rounded-lg text-sm font-display transition-all ${period === 'battle' ? 'bg-canvas-elevated text-canvas-bright' : 'text-canvas-muted'}`}>
-              Текущий батл
+              className={`px-4 py-2 rounded-lg text-sm font-display transition-all ${period === 'battle' ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30' : 'text-canvas-muted'}`}>
+              Соло батл
+            </button>
+            <button onClick={() => setPeriod('clan')}
+              className={`px-4 py-2 rounded-lg text-sm font-display transition-all ${period === 'clan' ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30' : 'text-canvas-muted'}`}>
+              Клановые
             </button>
             <button onClick={() => setPeriod('all')}
-              className={`px-5 py-2 rounded-lg text-sm font-display transition-all ${period === 'all' ? 'bg-canvas-elevated text-canvas-bright' : 'text-canvas-muted'}`}>
+              className={`px-4 py-2 rounded-lg text-sm font-display transition-all ${period === 'all' ? 'bg-canvas-elevated text-canvas-bright' : 'text-canvas-muted'}`}>
               Все время
             </button>
+          </div>
+
+          {/* Phase info */}
+          <div className="text-center mb-4 text-xs text-canvas-muted">
+            1-10 числа: Соло батл (кто поставит больше пикселей) · 11-20: Клановые войны (территория)
           </div>
 
           {/* Leaderboard */}
@@ -95,9 +104,10 @@ export function LeaderboardPage() {
               {players.map((p, i) => {
                 const rank = getRank(p.pixels);
                 const isMe = user?.id === p.user_id;
+                const isClan = p.is_clan;
                 return (
                   <motion.div
-                    key={p.user_id}
+                    key={isClan ? `clan-${p.clan_id}` : `user-${p.user_id}`}
                     initial={{ x: -20, opacity: 0 }}
                     animate={{ x: 0, opacity: 1 }}
                     transition={{ delay: i * 0.02 }}
@@ -113,12 +123,30 @@ export function LeaderboardPage() {
                       )}
                     </div>
                     <div className="flex-1 flex items-center gap-2 min-w-0">
-                      <RankIcon tier={rank.tier} size={16} />
-                      <span className="font-display text-sm text-canvas-bright truncate">{p.username}</span>
-                      {p.is_subscriber && <Crown size={11} className="text-yellow-400 flex-shrink-0" />}
-                      {isMe && <span className="text-[10px] text-orange-400 font-display flex-shrink-0">(ты)</span>}
+                      {isClan ? (
+                        <>
+                          <div className="w-5 h-5 rounded flex items-center justify-center text-[8px]" style={{ backgroundColor: p.clan_color || '#f97316' }}>
+                            {p.clan_tag?.[0] || '?'}
+                          </div>
+                          <span className="text-orange-400 font-mono text-xs">[{p.clan_tag}]</span>
+                          <span className="font-display text-sm text-canvas-bright truncate">{p.clan_name}</span>
+                          <span className="text-[10px] text-canvas-muted flex-shrink-0">{p.members_count} чел.</span>
+                        </>
+                      ) : (
+                        <>
+                          <RankIcon tier={rank.tier} size={16} />
+                          <span className="font-display text-sm text-canvas-bright truncate">{p.username}</span>
+                          {p.is_subscriber && <Crown size={11} className="text-yellow-400 flex-shrink-0" />}
+                          {isMe && <span className="text-[10px] text-orange-400 font-display flex-shrink-0">(ты)</span>}
+                        </>
+                      )}
                     </div>
-                    <span className="font-mono text-sm text-orange-400 flex-shrink-0">{p.pixels.toLocaleString()}</span>
+                    <span className="font-mono text-sm text-orange-400 flex-shrink-0">
+                      {p.pixels.toLocaleString()} {isClan ? 'тер.' : 'px'}
+                    </span>
+                  </motion.div>
+                );
+              })}
                   </motion.div>
                 );
               })}

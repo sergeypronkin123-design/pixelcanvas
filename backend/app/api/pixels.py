@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
 from datetime import datetime, timezone
 from app.core.database import get_db
-from app.core.security import get_current_user
+from app.core.security import get_current_user, get_optional_user
 from app.core.config import get_settings
 from app.models import User, Pixel, BattleParticipant, Battle
 from app.services.battle import is_battle_active, get_battle_end_time, get_next_battle_start, get_cooldown_seconds
@@ -24,6 +24,7 @@ class PlacePixelRequest(BaseModel):
 
 class BattleStatus(BaseModel):
     is_active: bool
+    phase: str  # "solo", "clan", "peace"
     battle_end: str | None
     next_battle_start: str | None
     online_count: int
@@ -31,12 +32,16 @@ class BattleStatus(BaseModel):
     canvas_height: int
     free_cooldown: int
     sub_cooldown: int
+    total_pixels_on_canvas: int = 0
+    my_pixels_on_canvas: int = 0
 
 
-@router.get("/status", response_model=BattleStatus)
-def get_status(db: Session = Depends(get_db)):
+@router.get("/status")
+def get_status(
+    db: Session = Depends(get_db),
+    user: User | None = Depends(get_optional_user),
+):
     # Opportunistically check battle finalization and pending redemptions
-    # (Render Free sleeps when idle, so scheduler may not run — check on requests too)
     try:
         from app.services import battle_awards
         pending = battle_awards.should_finalize_current_battle(db)
@@ -46,9 +51,26 @@ def get_status(db: Session = Depends(get_db)):
     except Exception:
         pass
 
+    from app.services.battle import get_battle_phase
     active = is_battle_active()
+    phase = get_battle_phase()
+
+    # Счётчик пикселей на холсте
+    total_on_canvas = 0
+    my_on_canvas = 0
+    try:
+        from app.services.canvas_cache import canvas_cache
+        total_on_canvas = canvas_cache.size()
+        if user:
+            my_on_canvas = sum(
+                1 for _, (_, uid, _) in canvas_cache._pixels.items() if uid == user.id
+            )
+    except Exception:
+        pass
+
     return BattleStatus(
         is_active=active,
+        phase=phase,
         battle_end=get_battle_end_time().isoformat() if active else None,
         next_battle_start=None if active else get_next_battle_start().isoformat(),
         online_count=manager.online_count,
@@ -56,6 +78,8 @@ def get_status(db: Session = Depends(get_db)):
         canvas_height=settings.CANVAS_HEIGHT,
         free_cooldown=settings.FREE_COOLDOWN_SECONDS,
         sub_cooldown=settings.SUB_COOLDOWN_SECONDS,
+        total_pixels_on_canvas=total_on_canvas,
+        my_pixels_on_canvas=my_on_canvas,
     )
 
 
@@ -149,7 +173,8 @@ async def place_pixel(data: PlacePixelRequest, user: User = Depends(get_current_
     # Track battle participation
     current_month = now.month
     current_year = now.year
-    battle = db.query(Battle).filter(Battle.year == current_year, Battle.month == current_month, Battle.is_active == True).first()
+    # Ищем любой батл этого месяца (не только active — чтобы не создавать дубликаты)
+    battle = db.query(Battle).filter(Battle.year == current_year, Battle.month == current_month).first()
     if not battle:
         battle = Battle(year=current_year, month=current_month, is_active=True, total_pixels_placed=0, total_participants=0)
         db.add(battle)

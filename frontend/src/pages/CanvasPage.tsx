@@ -76,6 +76,8 @@ export function CanvasPage() {
 
   const handlePixelPlaced = useCallback(() => {
     setTotalPixels((p) => p + 1);
+    // Optimistic: increment my_pixels locally
+    setStatus((prev: any) => prev ? { ...prev, my_pixels_on_canvas: (prev.my_pixels_on_canvas || 0) + 1 } : prev);
     setTimeout(() => loadUser(), 500);
   }, [loadUser]);
 
@@ -120,20 +122,33 @@ export function CanvasPage() {
       {/* HUD bar */}
       <div className="fixed top-14 left-0 right-0 z-40 flex items-center justify-between px-2 sm:px-3 py-1 glass text-[10px] sm:text-xs overflow-x-auto">
         <div className="flex items-center gap-1.5 sm:gap-3 flex-shrink-0">
-          {status?.is_active ? (
-            <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-red-500/10 border border-red-500/30">
-              <Swords size={10} className="text-red-400" />
-              <span className="font-display font-bold text-red-400 hidden sm:inline">BATTLE</span>
+          {status?.phase === 'solo' ? (
+            <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-orange-500/10 border border-orange-500/30">
+              <Swords size={10} className="text-orange-400" />
+              <span className="font-display font-bold text-orange-400 hidden sm:inline">СОЛО</span>
+            </div>
+          ) : status?.phase === 'clan' ? (
+            <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-purple-500/10 border border-purple-500/30">
+              <Swords size={10} className="text-purple-400" />
+              <span className="font-display font-bold text-purple-400 hidden sm:inline">КЛАНЫ</span>
             </div>
           ) : (
             <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-canvas-elevated border border-canvas-border">
               <Lock size={10} className="text-canvas-muted" />
+              <span className="font-display text-canvas-muted hidden sm:inline">Пауза</span>
             </div>
           )}
           <div className="flex items-center gap-1">
             <Clock size={10} className="text-orange-400" />
             <span className="font-mono text-orange-400 font-bold">{timeLeft}</span>
           </div>
+          {/* My pixels on canvas */}
+          {user && status?.my_pixels_on_canvas !== undefined && (
+            <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-neon-green/10 border border-neon-green/30">
+              <span className="font-mono text-neon-green font-bold">{(status.my_pixels_on_canvas || 0).toLocaleString()}</span>
+              <span className="text-neon-green/70 hidden sm:inline">блоков</span>
+            </div>
+          )}
         </div>
 
         <div className="flex items-center gap-1.5 sm:gap-3 flex-shrink-0">
@@ -203,12 +218,19 @@ export function CanvasPage() {
       )}
 
       {/* Battle inactive overlay */}
-      {!status?.is_active && (
+      {status && !status.is_active && (
         <div className="fixed inset-0 z-30 flex items-center justify-center pointer-events-none" style={{ paddingTop: '82px' }}>
           <div className="glass rounded-3xl px-10 py-8 text-center pointer-events-auto max-w-md">
             <Swords size={44} className="text-canvas-muted mx-auto mb-4" />
-            <h2 className="font-display font-bold text-2xl text-canvas-bright mb-2">Батл завершён</h2>
-            <p className="text-canvas-muted text-sm mb-4">Следующий батл начнётся 1 числа</p>
+            <h2 className="font-display font-bold text-2xl text-canvas-bright mb-2">Мирное время</h2>
+            <p className="text-canvas-muted text-sm mb-2">
+              Следующий батл: <span className="text-canvas-bright font-semibold">
+                {status.phase === 'peace' ? 'Соло (1-10 числа)' : 'скоро'}
+              </span>
+            </p>
+            <p className="text-xs text-canvas-muted mb-4">
+              1-10: Соло батл (кто больше пикселей) · 11-20: Клановые войны (территория)
+            </p>
             <div className="text-2xl font-mono text-orange-400 font-bold">{timeLeft}</div>
           </div>
         </div>

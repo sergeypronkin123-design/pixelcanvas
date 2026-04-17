@@ -3,41 +3,83 @@ from app.core.config import get_settings
 
 settings = get_settings()
 
+# Периоды батлов
+SOLO_START = 1
+SOLO_END = 10
+CLAN_START = 11
+CLAN_END = 20
+
+
+def get_battle_phase() -> str:
+    """
+    Возвращает текущую фазу:
+    - "solo" — соло батл (1-10 числа)
+    - "clan" — клановые войны (11-20 числа)
+    - "peace" — перерыв (21-31 числа)
+    """
+    day = datetime.now(timezone.utc).day
+    if SOLO_START <= day <= SOLO_END:
+        return "solo"
+    elif CLAN_START <= day <= CLAN_END:
+        return "clan"
+    return "peace"
+
 
 def is_battle_active() -> bool:
-    """Check if current date is within battle period (1st-7th of month)."""
-    now = datetime.now(timezone.utc)
-    return settings.BATTLE_DAY_START <= now.day <= settings.BATTLE_DAY_END
+    """Идёт ли какой-либо батл (соло или клановый)"""
+    return get_battle_phase() in ("solo", "clan")
+
+
+def is_solo_battle() -> bool:
+    return get_battle_phase() == "solo"
+
+
+def is_clan_battle() -> bool:
+    return get_battle_phase() == "clan"
 
 
 def get_battle_end_time() -> datetime:
-    """Get the end datetime of the current/next battle."""
+    """Когда заканчивается текущий/ближайший батл"""
     now = datetime.now(timezone.utc)
-    if now.day <= settings.BATTLE_DAY_END:
-        # Battle ends this month on BATTLE_DAY_END at 23:59:59
-        return now.replace(day=settings.BATTLE_DAY_END, hour=23, minute=59, second=59, microsecond=0)
+    phase = get_battle_phase()
+
+    if phase == "solo":
+        return now.replace(day=SOLO_END, hour=23, minute=59, second=59, microsecond=0)
+    elif phase == "clan":
+        return now.replace(day=CLAN_END, hour=23, minute=59, second=59, microsecond=0)
     else:
-        # Next battle ends next month
-        month = now.month + 1
-        year = now.year
-        if month > 12:
-            month = 1
-            year += 1
-        return datetime(year, month, settings.BATTLE_DAY_END, 23, 59, 59, tzinfo=timezone.utc)
+        # Мирное время — показать когда начнётся следующий соло
+        return get_next_battle_start()
 
 
 def get_next_battle_start() -> datetime:
-    """Get start of next battle."""
+    """Когда начнётся следующий батл"""
     now = datetime.now(timezone.utc)
-    if now.day < settings.BATTLE_DAY_START:
-        return now.replace(day=settings.BATTLE_DAY_START, hour=0, minute=0, second=0, microsecond=0)
-    else:
+    day = now.day
+
+    if day < SOLO_START:
+        return now.replace(day=SOLO_START, hour=0, minute=0, second=0, microsecond=0)
+    elif SOLO_END < day < CLAN_START:
+        return now.replace(day=CLAN_START, hour=0, minute=0, second=0, microsecond=0)
+    elif day > CLAN_END:
+        # Следующий месяц — соло
         month = now.month + 1
         year = now.year
         if month > 12:
             month = 1
             year += 1
-        return datetime(year, month, settings.BATTLE_DAY_START, 0, 0, 0, tzinfo=timezone.utc)
+        return datetime(year, month, SOLO_START, 0, 0, 0, tzinfo=timezone.utc)
+    else:
+        # Сейчас идёт батл — следующий после текущего
+        if day <= SOLO_END:
+            return now.replace(day=CLAN_START, hour=0, minute=0, second=0, microsecond=0)
+        else:
+            month = now.month + 1
+            year = now.year
+            if month > 12:
+                month = 1
+                year += 1
+            return datetime(year, month, SOLO_START, 0, 0, 0, tzinfo=timezone.utc)
 
 
 def get_cooldown_seconds(is_subscriber: bool) -> int:

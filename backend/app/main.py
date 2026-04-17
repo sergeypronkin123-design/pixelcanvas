@@ -90,12 +90,13 @@ def health():
 
 @app.get("/api/config")
 def get_config():
-    from app.services.battle import is_battle_active, get_battle_end_time, get_next_battle_start
+    from app.services.battle import is_battle_active, get_battle_end_time, get_next_battle_start, get_battle_phase
     active = is_battle_active()
     return {
         "canvas_width": settings.CANVAS_WIDTH,
         "canvas_height": settings.CANVAS_HEIGHT,
         "battle_active": active,
+        "battle_phase": get_battle_phase(),
         "battle_end": get_battle_end_time().isoformat() if active else None,
         "next_battle_start": None if active else get_next_battle_start().isoformat(),
         "free_cooldown": settings.FREE_COOLDOWN_SECONDS,
