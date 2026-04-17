@@ -19,4 +19,9 @@ class User(Base):
     clan_id = Column(Integer, nullable=True, index=True)
     clan_role = Column(String(20), nullable=True)
     clan_join_available_at = Column(DateTime(timezone=True), nullable=True)
+    # Daily rewards
+    last_daily_claim = Column(DateTime(timezone=True), nullable=True)
+    daily_streak = Column(Integer, default=0)
+    # Onboarding
+    onboarding_completed = Column(Boolean, default=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())

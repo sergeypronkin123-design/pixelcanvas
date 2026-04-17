@@ -91,7 +91,7 @@ export function LeaderboardPage() {
               <p className="text-canvas-muted">Пока нет игроков. Будь первым!</p>
             </div>
           ) : (
-            <div className="space-y-2">
+            <div className="bg-canvas-surface border border-canvas-border rounded-2xl divide-y divide-canvas-border overflow-hidden">
               {players.map((p, i) => {
                 const rank = getRank(p.pixels);
                 const isMe = user?.id === p.user_id;
@@ -100,31 +100,25 @@ export function LeaderboardPage() {
                     key={p.user_id}
                     initial={{ x: -20, opacity: 0 }}
                     animate={{ x: 0, opacity: 1 }}
-                    transition={{ delay: i * 0.03 }}
-                    className={`card !p-2 sm:!p-3 flex items-center gap-2 sm:gap-3 ${isMe ? 'border-orange-500/30 bg-orange-500/5' : ''}`}
+                    transition={{ delay: i * 0.02 }}
+                    className={`px-3 sm:px-4 py-2.5 flex items-center gap-2 sm:gap-3 transition-colors
+                      ${isMe ? 'bg-orange-500/5' : 'hover:bg-canvas-elevated/50'}
+                      ${p.rank <= 3 ? 'bg-canvas-elevated/30' : ''}`}
                   >
-                    {/* Rank number */}
-                    <div className="w-8 h-8 rounded-lg flex items-center justify-center font-display font-bold text-sm">
+                    <div className="w-8 h-8 flex items-center justify-center font-display font-bold text-sm flex-shrink-0">
                       {p.rank <= 3 ? (
-                        <MedalIcon place={p.rank as 1 | 2 | 3} size={28} />
+                        <MedalIcon place={p.rank as 1 | 2 | 3} size={26} />
                       ) : (
                         <span className="text-canvas-muted">{p.rank}</span>
                       )}
                     </div>
-
-                    {/* User info */}
-                    <div className="flex-1 flex items-center gap-2">
-                      <span><RankIcon tier={rank.tier} size={16} /></span>
-                      <span className="font-display font-semibold text-sm text-canvas-bright">{p.username}</span>
-                      {p.is_subscriber && <Crown size={12} className="text-yellow-400" />}
-                      {isMe && <span className="text-xs text-orange-400 font-display">(ты)</span>}
+                    <div className="flex-1 flex items-center gap-2 min-w-0">
+                      <RankIcon tier={rank.tier} size={16} />
+                      <span className="font-display text-sm text-canvas-bright truncate">{p.username}</span>
+                      {p.is_subscriber && <Crown size={11} className="text-yellow-400 flex-shrink-0" />}
+                      {isMe && <span className="text-[10px] text-orange-400 font-display flex-shrink-0">(ты)</span>}
                     </div>
-
-                    {/* Pixels count */}
-                    <div className="text-right">
-                      <span className="font-mono text-sm font-bold text-orange-400">{p.pixels.toLocaleString()}</span>
-                      <span className="text-xs text-canvas-muted ml-1">px</span>
-                    </div>
+                    <span className="font-mono text-sm text-orange-400 flex-shrink-0">{p.pixels.toLocaleString()}</span>
                   </motion.div>
                 );
               })}

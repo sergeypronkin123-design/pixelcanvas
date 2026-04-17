@@ -25,11 +25,12 @@ interface Props {
   battleActive: boolean;
   onPixelPlaced: () => void;
   pixelUpdates: { x: number; y: number; color: string }[];
+  onRefsReady?: (canvas: HTMLCanvasElement, offscreen: HTMLCanvasElement, viewport: { x: number; y: number; scale: number }) => void;
 }
 
 const W = 1000, H = 1000;
 
-export function CanvasRenderer({ battleActive, onPixelPlaced, pixelUpdates }: Props) {
+export function CanvasRenderer({ battleActive, onPixelPlaced, pixelUpdates, onRefsReady }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const user = useAuthStore((s) => s.user);
 
@@ -74,6 +75,13 @@ export function CanvasRenderer({ battleActive, onPixelPlaced, pixelUpdates }: Pr
 
   viewportRef.current = viewport;
 
+  // Report refs to parent for minimap/share
+  useEffect(() => {
+    if (canvasRef.current && offscreenRef.current && onRefsReady) {
+      onRefsReady(canvasRef.current, offscreenRef.current, viewport);
+    }
+  }, [viewport, onRefsReady]);
+
   // Init offscreen canvas and bitmap
   useEffect(() => {
     const off = document.createElement('canvas');
@@ -108,19 +116,26 @@ export function CanvasRenderer({ battleActive, onPixelPlaced, pixelUpdates }: Pr
     });
   }, []);
 
-  // Apply websocket pixel updates instantly to bitmap
+  // Apply websocket pixel updates instantly to bitmap + flash effect
+  const flashesRef = useRef<{ x: number; y: number; color: string; t: number }[]>([]);
+
   useEffect(() => {
     const bmp = bitmapRef.current;
     const off = offscreenRef.current;
     if (!bmp || !off) return;
     let dirty = false;
+    const now = performance.now();
     for (const p of pixelUpdates) {
       if (p.x < 0 || p.x >= W || p.y < 0 || p.y >= H) continue;
       const [r, g, b] = hexToRgb(p.color);
       const i = (p.y * W + p.x) * 4;
       bmp.data[i] = r; bmp.data[i+1] = g; bmp.data[i+2] = b; bmp.data[i+3] = 255;
       dirty = true;
+      // Track flash
+      flashesRef.current.push({ x: p.x, y: p.y, color: p.color, t: now });
     }
+    // Cleanup old flashes
+    flashesRef.current = flashesRef.current.filter((f) => now - f.t < 600);
     if (dirty) {
       off.getContext('2d')!.putImageData(bmp, 0, 0);
     }
@@ -217,6 +232,19 @@ export function CanvasRenderer({ battleActive, onPixelPlaced, pixelUpdates }: Pr
         for (let x = x1; x <= x2; x++) { ctx.beginPath(); ctx.moveTo(x, y1); ctx.lineTo(x, y2); ctx.stroke(); }
         for (let y = y1; y <= y2; y++) { ctx.beginPath(); ctx.moveTo(x1, y); ctx.lineTo(x2, y); ctx.stroke(); }
       }
+
+      // Flash effect — glow on recently placed pixels
+      const now = performance.now();
+      for (const f of flashesRef.current) {
+        const age = now - f.t;
+        if (age > 600) continue;
+        const alpha = 1 - age / 600;
+        const size = 1 + (1 - alpha) * 2;
+        ctx.globalAlpha = alpha * 0.6;
+        ctx.fillStyle = f.color;
+        ctx.fillRect(f.x - (size - 1) / 2, f.y - (size - 1) / 2, size, size);
+      }
+      ctx.globalAlpha = 1;
 
       // Hover highlight
       if (hoverPos && vp.scale >= 2) {
@@ -474,6 +502,17 @@ export function CanvasRenderer({ battleActive, onPixelPlaced, pixelUpdates }: Pr
               )}
             </div>
           )}
+          {/* Zoom controls (mobile-friendly) */}
+          <div className="pl-2 border-l border-canvas-border flex items-center gap-1">
+            <button onClick={() => setViewport((v) => ({ ...v, scale: Math.max(0.5, v.scale / 1.5) }))}
+              className="w-7 h-7 rounded-lg bg-canvas-bg border border-canvas-border flex items-center justify-center text-canvas-muted hover:text-canvas-bright text-sm font-bold">
+              −
+            </button>
+            <button onClick={() => setViewport((v) => ({ ...v, scale: Math.min(40, v.scale * 1.5) }))}
+              className="w-7 h-7 rounded-lg bg-canvas-bg border border-canvas-border flex items-center justify-center text-canvas-muted hover:text-canvas-bright text-sm font-bold">
+              +
+            </button>
+          </div>
         </div>
       </div>
     </div>

@@ -236,3 +236,22 @@ def get_cooldown(user: User = Depends(get_current_user)):
         "is_subscriber": is_sub,
         "bonus_pixels": bonus,
     }
+
+
+@router.get("/timelapse/{year}/{month}")
+def get_timelapse(year: int, month: int, db: Session = Depends(get_db)):
+    """Получить список снимков холста для таймлапса"""
+    from app.services.canvas_snapshot import get_timelapse_data
+    return {"snapshots": get_timelapse_data(db, year, month)}
+
+
+@router.get("/timelapse/snapshot/{snapshot_id}")
+def get_snapshot_data(snapshot_id: int, db: Session = Depends(get_db)):
+    """Получить данные одного снимка"""
+    from app.services.canvas_snapshot import CanvasSnapshot
+    from fastapi.responses import Response
+    snapshot = db.query(CanvasSnapshot).filter(CanvasSnapshot.id == snapshot_id).first()
+    if not snapshot:
+        raise HTTPException(404, "Snapshot not found")
+    return Response(content=snapshot.data_json or "[]", media_type="application/json",
+                    headers={"Cache-Control": "public, max-age=3600"})

@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { CanvasRenderer } from '@/components/canvas/CanvasRenderer';
 import { Navbar } from '@/components/layout/Navbar';
 import { useAuthStore } from '@/stores/authStore';
@@ -8,14 +8,30 @@ import { getRank } from '@/lib/ranks';
 import { Users, Clock, Swords, Crown, Lock } from 'lucide-react';
 import { RankIcon } from '@/components/icons/RankIcons';
 import { Link } from 'react-router-dom';
+import { OnboardingTutorial, DailyRewardPopup } from '@/components/game/OnboardingAndRewards';
+import { ShareArtButton } from '@/components/game/ShareArtButton';
+import { Minimap } from '@/components/canvas/Minimap';
+import { usePixelNotifications, PixelNotifications } from '@/components/game/PixelNotifications';
+import { useReactions, ReactionBar, FloatingReactions } from '@/components/game/Reactions';
 
 export function CanvasPage() {
   const { user, loadUser } = useAuthStore();
+  const [showOnboarding, setShowOnboarding] = useState(false);
   const [status, setStatus] = useState<any>(null);
   const [onlineCount, setOnlineCount] = useState(0);
   const [timeLeft, setTimeLeft] = useState('');
   const [pixelUpdates, setPixelUpdates] = useState<{ x: number; y: number; color: string }[]>([]);
   const [totalPixels, setTotalPixels] = useState(user?.pixels_placed_total || 0);
+
+  // Refs from CanvasRenderer
+  const canvasElRef = useRef<HTMLCanvasElement | null>(null);
+  const offscreenElRef = useRef<HTMLCanvasElement | null>(null);
+  const viewportRef = useRef({ x: 0, y: 0, scale: 1 });
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Notifications + Reactions
+  const { notifications, handleBatchPixels } = usePixelNotifications(user);
+  const { floating, addReaction } = useReactions();
 
   useEffect(() => {
     api.getBattleStatus().then((s) => { setStatus(s); setOnlineCount(s.online_count); }).catch(() => {});
@@ -23,13 +39,22 @@ export function CanvasPage() {
 
   useEffect(() => { setTotalPixels(user?.pixels_placed_total || 0); }, [user]);
 
+  useEffect(() => {
+    if (user && !user.onboarding_completed) setShowOnboarding(true);
+  }, [user]);
+
   const handleWS = useCallback((msg: any) => {
     if (msg.type === 'online_count') setOnlineCount(msg.count);
-    else if (msg.type === 'pixel') setPixelUpdates((prev) => [...prev, { x: msg.x, y: msg.y, color: msg.color }]);
-    else if (msg.type === 'pixels_batch' && Array.isArray(msg.pixels)) {
-      setPixelUpdates((prev) => [...prev, ...msg.pixels.map((p: any) => ({ x: p.x, y: p.y, color: p.color }))]);
+    else if (msg.type === 'pixel') {
+      setPixelUpdates((prev) => [...prev, { x: msg.x, y: msg.y, color: msg.color }]);
+    } else if (msg.type === 'pixels_batch' && Array.isArray(msg.pixels)) {
+      const batch = msg.pixels.map((p: any) => ({ x: p.x, y: p.y, color: p.color, user_id: p.user_id, clan_id: p.clan_id }));
+      setPixelUpdates((prev) => [...prev, ...batch]);
+      handleBatchPixels(batch);
+    } else if (msg.type === 'reaction') {
+      addReaction(msg.emoji);
     }
-  }, []);
+  }, [handleBatchPixels, addReaction]);
   useWebSocket(handleWS);
 
   // Timer
@@ -51,15 +76,46 @@ export function CanvasPage() {
 
   const handlePixelPlaced = useCallback(() => {
     setTotalPixels((p) => p + 1);
-    // Reload user to update server-side count
     setTimeout(() => loadUser(), 500);
   }, [loadUser]);
+
+  const handleRefsReady = useCallback((canvas: HTMLCanvasElement, offscreen: HTMLCanvasElement, vp: { x: number; y: number; scale: number }) => {
+    canvasElRef.current = canvas;
+    offscreenElRef.current = offscreen;
+    viewportRef.current = vp;
+  }, []);
+
+  const handleMinimapNavigate = useCallback((wx: number, wy: number) => {
+    // Навигация по мини-карте — посылаем событие в CanvasRenderer через viewport
+    // Простейший подход: устанавливаем viewport
+    const container = containerRef.current;
+    if (!container) return;
+    const rect = container.getBoundingClientRect();
+    const scale = viewportRef.current.scale;
+    // Центрируем viewport на (wx, wy)
+    const newX = -wx * scale + rect.width / 2;
+    const newY = -wy * scale + rect.height / 2;
+    // TODO: нужно прокинуть setViewport из CanvasRenderer
+    // Пока мини-карта показывает только обзор без навигации по клику
+  }, []);
 
   const rank = getRank(totalPixels);
 
   return (
     <div className="h-screen w-screen overflow-hidden bg-canvas-bg">
       <Navbar />
+
+      {/* Onboarding */}
+      {showOnboarding && <OnboardingTutorial onComplete={() => setShowOnboarding(false)} />}
+
+      {/* Daily reward */}
+      {!showOnboarding && user && <DailyRewardPopup />}
+
+      {/* Territory notifications */}
+      <PixelNotifications notifications={notifications} />
+
+      {/* Floating reactions */}
+      <FloatingReactions reactions={floating} />
 
       {/* HUD bar */}
       <div className="fixed top-14 left-0 right-0 z-40 flex items-center justify-between px-2 sm:px-3 py-1 glass text-[10px] sm:text-xs overflow-x-auto">
@@ -81,6 +137,14 @@ export function CanvasPage() {
         </div>
 
         <div className="flex items-center gap-1.5 sm:gap-3 flex-shrink-0">
+          {/* Reactions */}
+          {user && status?.is_active && (
+            <ReactionBar onReact={addReaction} />
+          )}
+
+          {/* Share */}
+          {user && <ShareArtButton canvasRef={canvasElRef as React.RefObject<HTMLCanvasElement>} />}
+
           {user && (
             <Link to="/profile" className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-canvas-elevated border border-canvas-border">
               <RankIcon tier={rank.tier} size={14} />
@@ -93,7 +157,6 @@ export function CanvasPage() {
             <span className="font-mono text-canvas-bright">{onlineCount}</span>
           </div>
 
-          {/* Pro */}
           {user?.is_subscriber ? (
             <div className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-yellow-500/10 border border-yellow-500/30">
               <Crown size={10} className="text-yellow-400" />
@@ -109,8 +172,26 @@ export function CanvasPage() {
       </div>
 
       {/* Canvas */}
-      <div className="pt-[82px] h-full">
-        <CanvasRenderer battleActive={status?.is_active || false} onPixelPlaced={handlePixelPlaced} pixelUpdates={pixelUpdates} />
+      <div ref={containerRef} className="pt-[82px] h-full relative">
+        <CanvasRenderer
+          battleActive={status?.is_active || false}
+          onPixelPlaced={handlePixelPlaced}
+          pixelUpdates={pixelUpdates}
+          onRefsReady={handleRefsReady}
+        />
+
+        {/* Minimap */}
+        {offscreenElRef.current && containerRef.current && (
+          <Minimap
+            offscreenCanvas={offscreenElRef.current}
+            viewport={viewportRef.current}
+            canvasWidth={1000}
+            canvasHeight={1000}
+            containerWidth={containerRef.current.clientWidth}
+            containerHeight={containerRef.current.clientHeight}
+            onNavigate={handleMinimapNavigate}
+          />
+        )}
       </div>
 
       {/* Login prompt */}

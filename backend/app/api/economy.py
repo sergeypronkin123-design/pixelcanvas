@@ -313,3 +313,34 @@ def get_my_palettes(user: User = Depends(get_current_user), db: Session = Depend
             })
 
     return {"palettes": result}
+
+
+@router.post("/daily-reward")
+def claim_daily_reward_endpoint(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Получить ежедневную награду"""
+    from app.services.daily_rewards import claim_daily_reward
+    return claim_daily_reward(db, user)
+
+
+@router.get("/daily-status")
+def daily_reward_status(user: User = Depends(get_current_user)):
+    """Проверить статус ежедневной награды"""
+    from datetime import datetime, timezone, timedelta
+    now = datetime.now(timezone.utc)
+    today = now.date()
+    last_claim = user.last_daily_claim
+    can_claim = not last_claim or last_claim.date() < today
+    tomorrow = datetime.combine(today + timedelta(days=1), datetime.min.time(), tzinfo=timezone.utc)
+    return {
+        "can_claim": can_claim,
+        "streak": user.daily_streak or 0,
+        "next_claim_at": None if can_claim else tomorrow.isoformat(),
+    }
+
+
+@router.post("/complete-onboarding")
+def complete_onboarding(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Пометить onboarding как завершённый"""
+    user.onboarding_completed = True
+    db.commit()
+    return {"status": "ok"}

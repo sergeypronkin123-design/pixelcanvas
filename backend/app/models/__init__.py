@@ -6,3 +6,4 @@ from app.models.economy import (
     CoinBalance, CoinTransaction, Achievement, UserAchievement,
     ShopItem, UserPurchase, UserPalette, ProRedemption
 )
+from app.services.canvas_snapshot import CanvasSnapshot

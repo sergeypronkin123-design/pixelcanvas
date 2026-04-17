@@ -13,6 +13,7 @@ import { LeaderboardPage } from '@/pages/LeaderboardPage';
 import { ReferralPage } from '@/pages/ReferralPage';
 import { ClansListPage, CreateClanPage, MyClanPage, ClanDetailPage, ClanInvitePage } from '@/pages/ClanPages';
 import { ShopPage, AchievementsPage } from '@/pages/EconomyPages';
+import { ServerWakingOverlay } from '@/components/layout/ServerWakingOverlay';
 import '@/styles/globals.css';
 
 function App() {
@@ -30,6 +31,7 @@ function App() {
 
   return (
     <BrowserRouter>
+      <ServerWakingOverlay />
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<LoginPage />} />

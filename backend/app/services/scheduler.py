@@ -42,5 +42,11 @@ async def run_checks():
         if activated > 0:
             logger.info(f"Activated {activated} pending Pro redemptions")
 
+        # 3. Снимок холста для таймлапса (если идёт батл)
+        from app.services.battle import is_battle_active
+        if is_battle_active():
+            from app.services.canvas_snapshot import take_snapshot
+            take_snapshot(db)
+
     finally:
         db.close()
