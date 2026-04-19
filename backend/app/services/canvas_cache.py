@@ -2,9 +2,9 @@
 Canvas cache — оптимизированная версия с фиксированным расходом памяти.
 
 Старая версия: Dict[(x,y) → tuple] ест ~200 байт/пиксель = 200MB при 1M → Render Free (512MB) падает.
-Новая версия: packed bytearray, 7 байт × 1M ячеек = 7MB фиксированно.
+Новая версия: packed bytearray, 8 байт × 1M ячеек = 8MB фиксированно.
 
-Формат ячейки (7 байт):
+Формат ячейки (8 байт):
   [r:u8][g:u8][b:u8][flag:u8][user_id_low:u16][clan_id:u16]
   flag=0 → пусто, flag=1 → занято
 """
@@ -20,8 +20,8 @@ logger = logging.getLogger(__name__)
 
 CANVAS_W = 1000
 CANVAS_H = 1000
-CELL_SIZE = 7
-TOTAL_BYTES = CANVAS_W * CANVAS_H * CELL_SIZE  # 7MB
+CELL_SIZE = 8  # 8 байт: rgb(3) + flag(1) + user_id_low(2) + clan_id(2)
+TOTAL_BYTES = CANVAS_W * CANVAS_H * CELL_SIZE  # 8MB
 
 REDIS_URL = os.environ.get("REDIS_URL", "")
 _redis = None
@@ -70,7 +70,7 @@ class CanvasCache:
 
         self._last_full_reload = time.time()
         self._cached_binary = None
-        logger.info(f"Canvas loaded: {self._count} pixels, memory=7MB fixed")
+        logger.info(f"Canvas loaded: {self._count} pixels, memory=8MB fixed")
 
     def _set_raw(self, x: int, y: int, color: str, user_id: int, clan_id: int):
         i = self._idx(x, y)
