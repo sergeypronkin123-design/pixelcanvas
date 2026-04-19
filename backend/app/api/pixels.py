@@ -1,10 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
 from datetime import datetime, timezone
 from app.core.database import get_db
 from app.core.security import get_current_user, get_optional_user
 from app.core.config import get_settings
+from app.core.ratelimit import limiter
 from app.models import User, Pixel, BattleParticipant, Battle
 from app.services.battle import is_battle_active, get_battle_end_time, get_next_battle_start, get_cooldown_seconds
 from app.services.websocket import manager
@@ -62,9 +63,7 @@ def get_status(
         from app.services.canvas_cache import canvas_cache
         total_on_canvas = canvas_cache.size()
         if user:
-            my_on_canvas = sum(
-                1 for _, (_, uid, _) in canvas_cache._pixels.items() if uid == user.id
-            )
+            my_on_canvas = canvas_cache.count_user_pixels(user.id)
     except Exception:
         pass
 
@@ -120,7 +119,8 @@ def get_canvas_binary(db: Session = Depends(get_db)):
 
 
 @router.post("/place")
-async def place_pixel(data: PlacePixelRequest, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+@limiter.limit("120/minute")
+async def place_pixel(request: Request, data: PlacePixelRequest, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     if not is_battle_active():
         raise HTTPException(400, "Батл не активен. Приходи 1 числа!")
 

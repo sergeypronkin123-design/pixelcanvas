@@ -14,7 +14,9 @@ export function useWebSocket(onMessage: (msg: WSMessage) => void) {
   useEffect(() => {
     function connect() {
       const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const wsUrl = import.meta.env.VITE_WS_URL || `${proto}//${window.location.host}/ws`;
+      const baseUrl = import.meta.env.VITE_WS_URL || `${proto}//${window.location.host}/ws`;
+      const token = localStorage.getItem('token');
+      const wsUrl = token ? `${baseUrl}?token=${encodeURIComponent(token)}` : baseUrl;
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
 

@@ -5,6 +5,7 @@ from pydantic import BaseModel
 from app.core.database import get_db
 from app.core.security import get_current_user
 from app.core.config import get_settings
+from app.core.ratelimit import limiter
 from app.models import User, Subscription, WebhookEvent
 import stripe
 import httpx
@@ -19,7 +20,9 @@ router = APIRouter(prefix="/subscribe", tags=["subscription"])
 
 
 @router.post("/checkout")
+@limiter.limit("10/minute")
 def create_subscription_checkout(
+    request: Request,
     provider: str = Query("robokassa", enum=["stripe", "yukassa", "robokassa"]),
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),

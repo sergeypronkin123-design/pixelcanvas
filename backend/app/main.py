@@ -64,6 +64,13 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="PixelStake API", version="2.0.0", lifespan=lifespan)
 
+# Rate limiting
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from app.core.ratelimit import limiter
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[settings.FRONTEND_URL, "http://localhost:5173", "http://localhost:3000"],

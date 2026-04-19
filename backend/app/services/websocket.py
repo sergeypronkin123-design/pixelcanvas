@@ -17,6 +17,7 @@ BATCH_INTERVAL_MS = 50  # 50мс — почти мгновенно для гла
 class ConnectionManager:
     def __init__(self):
         self.active_connections: Set[WebSocket] = set()
+        self._authenticated_users: Set[int] = set()
         self._lock = asyncio.Lock()
         self._pixel_buffer: List[Dict[str, Any]] = []
         self._buffer_lock = asyncio.Lock()
@@ -25,12 +26,16 @@ class ConnectionManager:
 
     @property
     def online_count(self) -> int:
-        return len(self.active_connections)
+        # Показываем только авторизованных пользователей
+        # (плюс минимум = общее число соединений для обратной совместимости)
+        return max(len(self._authenticated_users), 1) if self.active_connections else 0
 
-    async def connect(self, websocket: WebSocket):
+    async def connect(self, websocket: WebSocket, user_id: int | None = None):
         await websocket.accept()
         async with self._lock:
             self.active_connections.add(websocket)
+            if user_id:
+                self._authenticated_users.add(user_id)
         try:
             await websocket.send_text(json.dumps({"type": "online_count", "count": self.online_count}))
         except Exception:
