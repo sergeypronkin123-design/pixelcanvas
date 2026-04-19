@@ -1,0 +1,84 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  frontend:
+    name: Frontend (TypeScript + Vite build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install
+        working-directory: frontend
+        run: npm ci
+
+      - name: TypeScript check
+        working-directory: frontend
+        run: npx tsc --noEmit
+
+      - name: Vite build
+        working-directory: frontend
+        run: npm run build
+
+  backend:
+    name: Backend (Python import + syntax)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install
+        working-directory: backend
+        run: pip install -r requirements.txt
+
+      - name: Syntax check (all .py)
+        working-directory: backend
+        run: python -m compileall app
+
+      - name: Import check
+        working-directory: backend
+        env:
+          DATABASE_URL: "sqlite:///test.db"
+          SECRET_KEY: "ci-dummy-secret-key-for-import-check-only"
+          STRIPE_SECRET_KEY: "sk_test_dummy"
+          STRIPE_WEBHOOK_SECRET: "whsec_dummy"
+          ROBOKASSA_MERCHANT_LOGIN: "dummy"
+          ROBOKASSA_PASSWORD_1: "dummy"
+          ROBOKASSA_PASSWORD_2: "dummy"
+          FRONTEND_URL: "http://localhost"
+          BACKEND_URL: "http://localhost"
+          ADMIN_EMAIL: "a@a.com"
+          ADMIN_PASSWORD: "dummy"
+        run: python -c "from app.main import app; print('Backend imports OK')"
+
+  taboos:
+    name: Taboo check (h-screen, etc.)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: No h-screen in frontend
+        run: |
+          if grep -rn 'className="[^"]*h-screen' frontend/src | grep -v 'min-h-screen'; then
+            echo "::error::Found h-screen — use min-h-[100dvh] instead"
+            exit 1
+          fi
+      - name: No TODO-BLOCKER
+        run: |
+          if grep -rn "TODO-BLOCKER\|FIXME-BLOCKER" frontend/src backend/app 2>/dev/null; then
+            echo "::error::Found blocker TODO"
+            exit 1
+          fi
