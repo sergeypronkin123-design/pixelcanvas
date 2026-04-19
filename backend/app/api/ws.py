@@ -1,6 +1,6 @@
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
 from app.services.websocket import manager
-from app.core.security import decode_access_token
+from app.core.security import decode_token
 from app.core.database import SessionLocal
 from app.models.user import User
 import logging
@@ -18,7 +18,7 @@ async def websocket_endpoint(websocket: WebSocket, token: str | None = Query(Non
     user_id = None
     if token:
         try:
-            payload = decode_access_token(token)
+            payload = decode_token(token)
             user_id = int(payload.get("sub", 0)) if payload else None
         except Exception:
             user_id = None
