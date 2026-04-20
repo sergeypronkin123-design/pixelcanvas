@@ -124,6 +124,27 @@ class CanvasCache:
             "clan_id": cid if cid > 0 else None,
         }
 
+    def get_all_pixels_json(self) -> list:
+        """JSON формат всех занятых пикселей (для совместимости со старым endpoint)."""
+        result = []
+        for idx in range(CANVAS_W * CANVAS_H):
+            off = idx * CELL_SIZE
+            if self._buf[off + 3] == 0:
+                continue
+            x = idx % CANVAS_W
+            y = idx // CANVAS_W
+            r = self._buf[off]
+            g = self._buf[off + 1]
+            b = self._buf[off + 2]
+            uid_low, cid = struct.unpack_from('<HH', self._buf, off + 4)
+            result.append({
+                "x": x, "y": y,
+                "color": f"#{r:02x}{g:02x}{b:02x}",
+                "user_id": uid_low,
+                "clan_id": cid if cid > 0 else None,
+            })
+        return result
+
     def get_binary(self) -> bytes:
         now = time.time()
         if self._cached_binary is not None and (now - self._cached_binary_timestamp) < 1.0:
