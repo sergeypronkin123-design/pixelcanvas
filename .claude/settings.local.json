@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -m venv venv)",
+      "Bash(venv/Scripts/pip install *)",
+      "Bash(bash *)",
+      "Read(//c/Users/serge/AppData/Local/Temp/claude/C--Users-serge-Downloads-pixelcanvas/5ec4ed0a-cff1-4431-8a71-266f38a6b461/tasks/**)",
+      "Bash(git add *)"
+    ]
+  }
+}

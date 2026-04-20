@@ -19,6 +19,7 @@ class UserRegister(BaseModel):
     username: str = Field(min_length=3, max_length=30)
     password: str = Field(min_length=6, max_length=128)
     ref: Optional[str] = None
+    captcha_token: Optional[str] = None
 
     @field_validator("username")
     @classmethod
@@ -31,6 +32,7 @@ class UserRegister(BaseModel):
 class UserLogin(BaseModel):
     email: EmailStr
     password: str
+    captcha_token: Optional[str] = None
 
 
 class UserOut(BaseModel):
@@ -61,7 +63,13 @@ class TokenResponse(BaseModel):
 
 @router.post("/register", response_model=TokenResponse)
 @limiter.limit("3/minute")
-def register(request: Request, data: UserRegister, db: Session = Depends(get_db)):
+async def register(request: Request, data: UserRegister, db: Session = Depends(get_db)):
+    # Verify captcha (skipped in dev if TURNSTILE_SECRET_KEY not set)
+    from app.core.captcha import verify_turnstile
+    client_ip = request.client.host if request.client else None
+    if not await verify_turnstile(data.captcha_token or "", client_ip):
+        raise HTTPException(400, "Проверка защиты от ботов не пройдена. Обновите страницу и попробуйте снова.")
+
     if db.query(User).filter(User.email == data.email).first():
         raise HTTPException(400, "Email already registered")
     if db.query(User).filter(User.username == data.username).first():
@@ -112,7 +120,13 @@ def register(request: Request, data: UserRegister, db: Session = Depends(get_db)
 
 @router.post("/login", response_model=TokenResponse)
 @limiter.limit("5/minute")
-def login(request: Request, data: UserLogin, db: Session = Depends(get_db)):
+async def login(request: Request, data: UserLogin, db: Session = Depends(get_db)):
+    # Verify captcha
+    from app.core.captcha import verify_turnstile
+    client_ip = request.client.host if request.client else None
+    if not await verify_turnstile(data.captcha_token or "", client_ip):
+        raise HTTPException(400, "Проверка защиты от ботов не пройдена. Обновите страницу и попробуйте снова.")
+
     user = db.query(User).filter(User.email == data.email).first()
     if not user or not verify_password(data.password, user.password_hash):
         raise HTTPException(401, "Invalid credentials")

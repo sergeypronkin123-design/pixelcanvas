@@ -57,7 +57,14 @@ echo ""
 echo -e "${YELLOW}[3/5] Backend Python import check...${NC}"
 if [ -d "backend" ]; then
   cd backend
-  if python3 -c "import sys; sys.path.insert(0, '.'); from app.main import app; print('app imported OK')" 2>&1; then
+  if [ -f "venv/Scripts/python.exe" ]; then
+    PYTHON="venv/Scripts/python.exe"
+  elif [ -f "venv/bin/python" ]; then
+    PYTHON="venv/bin/python"
+  else
+    PYTHON="python3"
+  fi
+  if "$PYTHON" -c "import sys; sys.path.insert(0, '.'); from app.main import app; print('app imported OK')" 2>&1; then
     echo -e "${GREEN}  ✓ Backend imports OK${NC}"
   else
     echo -e "${RED}  ✗ Backend import failed — ImportError will crash Render${NC}"
@@ -73,8 +80,15 @@ echo ""
 echo -e "${YELLOW}[4/5] Backend syntax check (all .py files)...${NC}"
 if [ -d "backend" ]; then
   SYNTAX_ERR=0
+  if [ -f "backend/venv/Scripts/python.exe" ]; then
+    PYTHON3="backend/venv/Scripts/python.exe"
+  elif [ -f "backend/venv/bin/python" ]; then
+    PYTHON3="backend/venv/bin/python"
+  else
+    PYTHON3="python3"
+  fi
   while IFS= read -r pyfile; do
-    if ! python3 -m py_compile "$pyfile" 2>&1; then
+    if ! "$PYTHON3" -m py_compile "$pyfile" 2>&1; then
       echo -e "${RED}  ✗ Syntax error in $pyfile${NC}"
       SYNTAX_ERR=$((SYNTAX_ERR + 1))
     fi

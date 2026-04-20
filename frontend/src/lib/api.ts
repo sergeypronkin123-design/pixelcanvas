@@ -66,10 +66,10 @@ async function request<T>(path: string, options?: RequestInit, retries = 3): Pro
 }
 
 export const api = {
-  register: (email: string, username: string, password: string, ref?: string) =>
-    request<any>('/api/auth/register', { method: 'POST', body: JSON.stringify({ email, username, password, ref: ref || null }) }),
-  login: (email: string, password: string) =>
-    request<any>('/api/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
+  register: (email: string, username: string, password: string, ref?: string, captcha_token?: string) =>
+    request<any>('/api/auth/register', { method: 'POST', body: JSON.stringify({ email, username, password, ref: ref || null, captcha_token: captcha_token || null }) }),
+  login: (email: string, password: string, captcha_token?: string) =>
+    request<any>('/api/auth/login', { method: 'POST', body: JSON.stringify({ email, password, captcha_token: captcha_token || null }) }),
   getMe: () => request<any>('/api/auth/me'),
   getConfig: () => request<any>('/api/config'),
   getBattleStatus: () => request<any>('/api/pixels/status'),

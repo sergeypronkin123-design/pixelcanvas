@@ -104,7 +104,7 @@ export function CanvasPage() {
   const rank = getRank(totalPixels);
 
   return (
-    <div className="h-screen w-screen overflow-hidden bg-canvas-bg">
+    <div className="min-h-[100dvh] w-screen overflow-hidden bg-canvas-bg">
       <Navbar />
 
       {/* Onboarding */}

@@ -111,4 +111,5 @@ def get_config():
         "sub_price_usd": settings.SUB_PRICE_USD,
         "sub_price_rub": settings.SUB_PRICE_RUB,
         "stripe_publishable_key": settings.STRIPE_PUBLISHABLE_KEY,
+        "turnstile_site_key": settings.TURNSTILE_SITE_KEY,
     }
