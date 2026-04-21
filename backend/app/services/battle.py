@@ -3,30 +3,39 @@ from app.core.config import get_settings
 
 settings = get_settings()
 
-# Периоды батлов
-SOLO_START = 1
-SOLO_END = 10
-CLAN_START = 11
-CLAN_END = 20
+
+def _solo_start() -> int:
+    return settings.BATTLE_SOLO_START
+
+
+def _solo_end() -> int:
+    return settings.BATTLE_SOLO_END
+
+
+def _clan_start() -> int:
+    return settings.BATTLE_CLAN_START
+
+
+def _clan_end() -> int:
+    return settings.BATTLE_CLAN_END
 
 
 def get_battle_phase() -> str:
     """
     Возвращает текущую фазу:
-    - "solo" — соло батл (1-10 числа)
-    - "clan" — клановые войны (11-20 числа)
-    - "peace" — перерыв (21-31 числа)
+    - "solo" — соло батл
+    - "clan" — клановые войны
+    - "peace" — перерыв
     """
     day = datetime.now(timezone.utc).day
-    if SOLO_START <= day <= SOLO_END:
+    if _solo_start() <= day <= _solo_end():
         return "solo"
-    elif CLAN_START <= day <= CLAN_END:
+    elif _clan_start() <= day <= _clan_end():
         return "clan"
     return "peace"
 
 
 def is_battle_active() -> bool:
-    """Идёт ли какой-либо батл (соло или клановый)"""
     return get_battle_phase() in ("solo", "clan")
 
 
@@ -44,11 +53,10 @@ def get_battle_end_time() -> datetime:
     phase = get_battle_phase()
 
     if phase == "solo":
-        return now.replace(day=SOLO_END, hour=23, minute=59, second=59, microsecond=0)
+        return now.replace(day=_solo_end(), hour=23, minute=59, second=59, microsecond=0)
     elif phase == "clan":
-        return now.replace(day=CLAN_END, hour=23, minute=59, second=59, microsecond=0)
+        return now.replace(day=_clan_end(), hour=23, minute=59, second=59, microsecond=0)
     else:
-        # Мирное время — показать когда начнётся следующий соло
         return get_next_battle_start()
 
 
@@ -57,29 +65,32 @@ def get_next_battle_start() -> datetime:
     now = datetime.now(timezone.utc)
     day = now.day
 
-    if day < SOLO_START:
-        return now.replace(day=SOLO_START, hour=0, minute=0, second=0, microsecond=0)
-    elif SOLO_END < day < CLAN_START:
-        return now.replace(day=CLAN_START, hour=0, minute=0, second=0, microsecond=0)
-    elif day > CLAN_END:
+    solo_s, solo_e = _solo_start(), _solo_end()
+    clan_s, clan_e = _clan_start(), _clan_end()
+
+    if day < solo_s:
+        return now.replace(day=solo_s, hour=0, minute=0, second=0, microsecond=0)
+    elif solo_e < day < clan_s:
+        return now.replace(day=clan_s, hour=0, minute=0, second=0, microsecond=0)
+    elif day > clan_e:
         # Следующий месяц — соло
         month = now.month + 1
         year = now.year
         if month > 12:
             month = 1
             year += 1
-        return datetime(year, month, SOLO_START, 0, 0, 0, tzinfo=timezone.utc)
+        return datetime(year, month, solo_s, 0, 0, 0, tzinfo=timezone.utc)
     else:
         # Сейчас идёт батл — следующий после текущего
-        if day <= SOLO_END:
-            return now.replace(day=CLAN_START, hour=0, minute=0, second=0, microsecond=0)
+        if day <= solo_e:
+            return now.replace(day=clan_s, hour=0, minute=0, second=0, microsecond=0)
         else:
             month = now.month + 1
             year = now.year
             if month > 12:
                 month = 1
                 year += 1
-            return datetime(year, month, SOLO_START, 0, 0, 0, tzinfo=timezone.utc)
+            return datetime(year, month, solo_s, 0, 0, 0, tzinfo=timezone.utc)
 
 
 def get_cooldown_seconds(is_subscriber: bool) -> int:

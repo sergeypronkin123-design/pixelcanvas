@@ -30,6 +30,11 @@ class Settings(BaseSettings):
     CANVAS_HEIGHT: int = 1000
     BATTLE_DAY_START: int = 1
     BATTLE_DAY_END: int = 7
+    # Battle phase boundaries — day-of-month
+    BATTLE_SOLO_START: int = 1
+    BATTLE_SOLO_END: int = 10
+    BATTLE_CLAN_START: int = 11
+    BATTLE_CLAN_END: int = 20
     FREE_COOLDOWN_SECONDS: int = 30
     SUB_COOLDOWN_SECONDS: int = 5
     SUB_PRICE_USD: int = 499  # cents
