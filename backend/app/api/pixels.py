@@ -132,7 +132,7 @@ async def place_pixel(request: Request, data: PlacePixelRequest, user: User = De
     if (user.bonus_pixels or 0) > 0:
         using_bonus = True
     else:
-        cooldown = get_cooldown_seconds(is_sub)
+        cooldown = get_cooldown_seconds(is_sub, user_id=user.id)
         if user.last_pixel_at:
             elapsed = (now - user.last_pixel_at).total_seconds()
             if elapsed < cooldown:
@@ -229,7 +229,7 @@ async def place_pixel(request: Request, data: PlacePixelRequest, user: User = De
 
     asyncio.create_task(_background_economy())
 
-    cooldown = 0 if (user.bonus_pixels or 0) > 0 else get_cooldown_seconds(is_sub)
+    cooldown = 0 if (user.bonus_pixels or 0) > 0 else get_cooldown_seconds(is_sub, user_id=user.id)
 
     return {
         "status": "ok",
@@ -243,7 +243,7 @@ async def place_pixel(request: Request, data: PlacePixelRequest, user: User = De
 @router.get("/cooldown")
 def get_cooldown(user: User = Depends(get_current_user)):
     is_sub = user.is_subscriber and user.subscription_until and user.subscription_until > datetime.now(timezone.utc)
-    cooldown = get_cooldown_seconds(is_sub)
+    cooldown = get_cooldown_seconds(is_sub, user_id=user.id)
     now = datetime.now(timezone.utc)
     remaining = 0
     if user.last_pixel_at:
