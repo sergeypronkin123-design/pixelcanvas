@@ -59,7 +59,7 @@ class CanvasCache:
         batch_size = 10000
         offset = 0
         while True:
-            batch = db.query(Pixel).offset(offset).limit(batch_size).all()
+            batch = db.query(Pixel).order_by(Pixel.id).offset(offset).limit(batch_size).all()
             if not batch:
                 break
             for p in batch:
