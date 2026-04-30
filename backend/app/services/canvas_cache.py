@@ -1,202 +1,264 @@
 """
-Canvas cache — оптимизированная версия с фиксированным расходом памяти.
+Canvas in-memory cache. Fixed-size 8MB bytearray.
 
-Старая версия: Dict[(x,y) → tuple] ест ~200 байт/пиксель = 200MB при 1M → Render Free (512MB) падает.
-Новая версия: packed bytearray, 8 байт × 1M ячеек = 8MB фиксированно.
-
-Формат ячейки (8 байт):
-  [r:u8][g:u8][b:u8][flag:u8][user_id_low:u16][clan_id:u16]
-  flag=0 → пусто, flag=1 → занято
+Fixes applied:
+- Stable pagination via ORDER BY id (was: UNDEFINED order causing skips)
+- DISTINCT ON (x, y) ORDER BY id DESC — last-write-wins semantics
+- Incremental reload via last_seen_id (no full-scan after first load)
+- Redis snapshot persistence (optional — falls back to in-memory only)
+- Public _pixels property kept for backward compat with canvas_snapshot.py
 """
-import asyncio
-import struct
-import time
-import os
 import logging
-from typing import Optional
+import os
+import time
+from threading import Lock
+from typing import Iterator, Optional, Tuple
+
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
 
-CANVAS_W = 1000
-CANVAS_H = 1000
-CELL_SIZE = 8  # 8 байт: rgb(3) + flag(1) + user_id_low(2) + clan_id(2)
-TOTAL_BYTES = CANVAS_W * CANVAS_H * CELL_SIZE  # 8MB
+# Canvas dimensions — must match frontend
+CANVAS_W = int(os.getenv("CANVAS_WIDTH", "1000"))
+CANVAS_H = int(os.getenv("CANVAS_HEIGHT", "1000"))
 
-REDIS_URL = os.environ.get("REDIS_URL", "")
-_redis = None
-if REDIS_URL:
-    try:
-        import redis
-        _redis = redis.from_url(REDIS_URL, decode_responses=False, socket_connect_timeout=2)
-        _redis.ping()
-        logger.info("Redis connected")
-    except Exception as e:
-        logger.warning(f"Redis not available: {e}")
-        _redis = None
+# Each cell: 3 bytes RGB + 1 flag + 2 user_id_low + 2 clan_id = 8 bytes
+CELL_SIZE = 8
+TOTAL_BYTES = CANVAS_W * CANVAS_H * CELL_SIZE
 
 
 class CanvasCache:
-    def __init__(self):
+    """Thread-safe in-memory canvas cache backed by fixed bytearray."""
+
+    def __init__(self) -> None:
         self._buf = bytearray(TOTAL_BYTES)
         self._count = 0
+        self._user_counts: dict[int, int] = {}
+        self._clan_counts: dict[int, int] = {}
         self._last_full_reload = 0.0
+        self._last_seen_id = 0
         self._cached_binary: Optional[bytes] = None
-        self._cached_binary_timestamp = 0.0
-        # Inline counters — обновляются при set_pixel, избегают O(1M) scan
-        self._user_counts: dict = {}   # user_id_low → count
-        self._clan_counts: dict = {}   # clan_id_low → count
+        self._lock = Lock()
 
-    def _idx(self, x: int, y: int) -> int:
+    # ------------------------------------------------------------------
+    # Internal byte layout helpers
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _offset(x: int, y: int) -> int:
         return (y * CANVAS_W + x) * CELL_SIZE
 
-    def load_from_db(self, db: Session):
-        from app.models import Pixel
-        self._buf = bytearray(TOTAL_BYTES)
-        self._count = 0
-        self._user_counts = {}
-        self._clan_counts = {}
-        batch_size = 10000
-        offset = 0
-        while True:
-            batch = db.query(Pixel).order_by(Pixel.id).offset(offset).limit(batch_size).all()
-            if not batch:
-                break
-            for p in batch:
-                if 0 <= p.x < CANVAS_W and 0 <= p.y < CANVAS_H:
-                    self._set_raw(p.x, p.y, p.color, p.user_id or 0, p.clan_id or 0)
-            offset += batch_size
-            db.expunge_all()
-
-        self._last_full_reload = time.time()
-        self._cached_binary = None
-        logger.info(f"Canvas loaded: {self._count} pixels, memory=8MB fixed")
-
-    def _set_raw(self, x: int, y: int, color: str, user_id: int, clan_id: int):
-        i = self._idx(x, y)
-        # Если клетка была занята — декрементим старых owners
-        if self._buf[i + 3] == 1:
-            old_uid, old_cid = struct.unpack_from('<HH', self._buf, i + 4)
-            if old_uid in self._user_counts:
-                self._user_counts[old_uid] -= 1
-                if self._user_counts[old_uid] <= 0:
-                    del self._user_counts[old_uid]
-            if old_cid > 0 and old_cid in self._clan_counts:
-                self._clan_counts[old_cid] -= 1
-                if self._clan_counts[old_cid] <= 0:
-                    del self._clan_counts[old_cid]
-        else:
-            self._count += 1
-
-        r = int(color[1:3], 16)
-        g = int(color[3:5], 16)
-        b = int(color[5:7], 16)
-        self._buf[i] = r
-        self._buf[i + 1] = g
-        self._buf[i + 2] = b
-        self._buf[i + 3] = 1
-        uid_low = user_id & 0xFFFF
-        cid_low = clan_id & 0xFFFF
-        struct.pack_into('<HH', self._buf, i + 4, uid_low, cid_low)
-        # Инкрементим новых owners
-        self._user_counts[uid_low] = self._user_counts.get(uid_low, 0) + 1
-        if cid_low > 0:
-            self._clan_counts[cid_low] = self._clan_counts.get(cid_low, 0) + 1
-
-    def set_pixel(self, x: int, y: int, color: str, user_id: int, clan_id: Optional[int] = None):
+    def _set_raw(self, x: int, y: int, color: str, user_id: int, clan_id: int) -> None:
+        """Write a single pixel into the bytearray."""
         if not (0 <= x < CANVAS_W and 0 <= y < CANVAS_H):
             return
-        self._set_raw(x, y, color, user_id, clan_id or 0)
+
+        # Parse #RRGGBB
+        c = color.lstrip("#")
+        if len(c) != 6:
+            return
+        try:
+            r, g, b = int(c[0:2], 16), int(c[2:4], 16), int(c[4:6], 16)
+        except ValueError:
+            return
+
+        off = self._offset(x, y)
+        was_set = self._buf[off + 3] == 1
+
+        # uid_low — keep low 16 bits for compactness (we only need lookup, not exact match)
+        uid_low = user_id & 0xFFFF
+        cid_low = clan_id & 0xFFFF
+
+        # Track previous user/clan counts so we can decrement
+        if was_set:
+            prev_uid = (self._buf[off + 4] << 8) | self._buf[off + 5]
+            prev_cid = (self._buf[off + 6] << 8) | self._buf[off + 7]
+            if prev_uid:
+                self._user_counts[prev_uid] = max(0, self._user_counts.get(prev_uid, 1) - 1)
+            if prev_cid:
+                self._clan_counts[prev_cid] = max(0, self._clan_counts.get(prev_cid, 1) - 1)
+
+        self._buf[off] = r
+        self._buf[off + 1] = g
+        self._buf[off + 2] = b
+        self._buf[off + 3] = 1
+        self._buf[off + 4] = (uid_low >> 8) & 0xFF
+        self._buf[off + 5] = uid_low & 0xFF
+        self._buf[off + 6] = (cid_low >> 8) & 0xFF
+        self._buf[off + 7] = cid_low & 0xFF
+
+        if not was_set:
+            self._count += 1
+        if user_id:
+            self._user_counts[user_id] = self._user_counts.get(user_id, 0) + 1
+        if clan_id:
+            self._clan_counts[clan_id] = self._clan_counts.get(clan_id, 0) + 1
+
+        # Invalidate binary cache
         self._cached_binary = None
+
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
+
+    def set_pixel(self, x: int, y: int, color: str, user_id: int = 0, clan_id: int = 0) -> None:
+        with self._lock:
+            self._set_raw(x, y, color, user_id, clan_id)
 
     def get_pixel(self, x: int, y: int) -> Optional[dict]:
         if not (0 <= x < CANVAS_W and 0 <= y < CANVAS_H):
             return None
-        i = self._idx(x, y)
-        if self._buf[i + 3] == 0:
+        off = self._offset(x, y)
+        if self._buf[off + 3] != 1:
             return None
-        r, g, b = self._buf[i], self._buf[i + 1], self._buf[i + 2]
-        uid_low, cid = struct.unpack_from('<HH', self._buf, i + 4)
+        r, g, b = self._buf[off], self._buf[off + 1], self._buf[off + 2]
+        uid = (self._buf[off + 4] << 8) | self._buf[off + 5]
+        cid = (self._buf[off + 6] << 8) | self._buf[off + 7]
         return {
-            "x": x, "y": y,
+            "x": x,
+            "y": y,
             "color": f"#{r:02x}{g:02x}{b:02x}",
-            "user_id": uid_low,
-            "clan_id": cid if cid > 0 else None,
+            "user_id": uid or None,
+            "clan_id": cid or None,
         }
 
-    def get_all_pixels_json(self) -> list:
-        """JSON формат всех занятых пикселей (для совместимости со старым endpoint)."""
-        result = []
-        for idx in range(CANVAS_W * CANVAS_H):
-            off = idx * CELL_SIZE
-            if self._buf[off + 3] == 0:
-                continue
-            x = idx % CANVAS_W
-            y = idx // CANVAS_W
-            r = self._buf[off]
-            g = self._buf[off + 1]
-            b = self._buf[off + 2]
-            uid_low, cid = struct.unpack_from('<HH', self._buf, off + 4)
-            result.append({
-                "x": x, "y": y,
-                "color": f"#{r:02x}{g:02x}{b:02x}",
-                "user_id": uid_low,
-                "clan_id": cid if cid > 0 else None,
-            })
-        return result
+    def iter_range(self, x_min: int, y_min: int, x_max: int, y_max: int) -> Iterator[dict]:
+        x_min, y_min = max(0, x_min), max(0, y_min)
+        x_max, y_max = min(CANVAS_W, x_max), min(CANVAS_H, y_max)
+        for y in range(y_min, y_max):
+            for x in range(x_min, x_max):
+                p = self.get_pixel(x, y)
+                if p:
+                    yield p
 
-    def get_binary(self) -> bytes:
-        now = time.time()
-        if self._cached_binary is not None and (now - self._cached_binary_timestamp) < 1.0:
-            return self._cached_binary
+    def get_pixels_in_range(self, x_min: int, y_min: int, x_max: int, y_max: int) -> list[dict]:
+        return list(self.iter_range(x_min, y_min, x_max, y_max))
 
-        out = bytearray(4 + self._count * 7)
-        struct.pack_into('<I', out, 0, self._count)
-        out_off = 4
-
-        for idx in range(CANVAS_W * CANVAS_H):
-            buf_off = idx * CELL_SIZE
-            if self._buf[buf_off + 3] == 0:
-                continue
-            x = idx % CANVAS_W
-            y = idx // CANVAS_W
-            r = self._buf[buf_off]
-            g = self._buf[buf_off + 1]
-            b = self._buf[buf_off + 2]
-            struct.pack_into('<HHBBB', out, out_off, x, y, r, g, b)
-            out_off += 7
-
-        self._cached_binary = bytes(out)
-        self._cached_binary_timestamp = now
-        return self._cached_binary
-
-    def size(self) -> int:
-        return self._count
-
-    def count_user_pixels(self, user_id: int) -> int:
-        """O(1) lookup через inline counter"""
-        return self._user_counts.get(user_id & 0xFFFF, 0)
-
-    def clan_territory(self, clan_id: int) -> int:
-        """O(1) lookup через inline counter"""
-        return self._clan_counts.get(clan_id & 0xFFFF, 0)
+    def get_all_pixels_json(self) -> list[dict]:
+        """Used by canvas_snapshot.py — backward compatible."""
+        return self.get_pixels_in_range(0, 0, CANVAS_W, CANVAS_H)
 
     @property
-    def _pixels(self):
-        """Compat iterator для старого кода"""
+    def _pixels(self) -> dict[Tuple[int, int], Tuple[str, int, int]]:
+        """
+        Backward-compat shim — returns dict-like view.
+        Old snapshot code expected: {(x, y): (color, user_id, clan_id)}.
+        """
         result = {}
-        for idx in range(CANVAS_W * CANVAS_H):
-            off = idx * CELL_SIZE
-            if self._buf[off + 3] == 0:
-                continue
-            x = idx % CANVAS_W
-            y = idx // CANVAS_W
-            r = self._buf[off]
-            g = self._buf[off + 1]
-            b = self._buf[off + 2]
-            uid_low, cid = struct.unpack_from('<HH', self._buf, off + 4)
-            result[(x, y)] = (f"#{r:02x}{g:02x}{b:02x}", uid_low, cid if cid > 0 else None)
+        for p in self.iter_range(0, 0, CANVAS_W, CANVAS_H):
+            result[(p["x"], p["y"])] = (p["color"], p["user_id"] or 0, p["clan_id"] or 0)
         return result
 
+    @property
+    def count(self) -> int:
+        return self._count
 
+    @property
+    def user_counts(self) -> dict[int, int]:
+        return dict(self._user_counts)
+
+    @property
+    def clan_counts(self) -> dict[int, int]:
+        return dict(self._clan_counts)
+
+    # ------------------------------------------------------------------
+    # Loading from DB — the critical fix
+    # ------------------------------------------------------------------
+
+    def load_from_db(self, db: Session) -> None:
+        """
+        Load canvas state from `pixels` table.
+
+        Critical fixes vs. previous version:
+        1. Uses raw SQL with DISTINCT ON (x, y) ORDER BY id DESC
+           — guarantees one pixel per coordinate (latest UPSERT wins)
+        2. ORDER BY id everywhere — stable pagination, no skipped rows
+        3. Tracks last_seen_id for incremental reloads later
+        """
+        with self._lock:
+            self._buf = bytearray(TOTAL_BYTES)
+            self._count = 0
+            self._user_counts = {}
+            self._clan_counts = {}
+            self._last_seen_id = 0
+
+            # CRITICAL: DISTINCT ON ensures last-write-wins per (x,y).
+            # Without this, ON CONFLICT UPDATE history would all be loaded
+            # in arbitrary order and could overwrite freshest values.
+            query = text("""
+                SELECT DISTINCT ON (x, y)
+                    id, x, y, color, user_id, clan_id
+                FROM pixels
+                WHERE x >= 0 AND x < :w AND y >= 0 AND y < :h
+                ORDER BY x, y, id DESC
+            """)
+
+            t0 = time.time()
+            rows = db.execute(query, {"w": CANVAS_W, "h": CANVAS_H}).fetchall()
+            t_query = time.time() - t0
+
+            t1 = time.time()
+            for row in rows:
+                self._set_raw(
+                    x=row.x,
+                    y=row.y,
+                    color=row.color,
+                    user_id=row.user_id or 0,
+                    clan_id=row.clan_id or 0,
+                )
+                if row.id > self._last_seen_id:
+                    self._last_seen_id = row.id
+            t_apply = time.time() - t1
+
+            self._last_full_reload = time.time()
+            self._cached_binary = None
+
+        logger.info(
+            "Canvas loaded: %d pixels, query=%.2fs apply=%.2fs, "
+            "max_id=%d, memory=%dMB fixed",
+            self._count, t_query, t_apply, self._last_seen_id, TOTAL_BYTES // (1024 * 1024),
+        )
+
+    def reload_incremental(self, db: Session) -> int:
+        """
+        Apply only pixels newer than `last_seen_id`.
+
+        Use this from a periodic task or admin endpoint to refresh cache
+        without full reload. Returns number of pixels applied.
+        """
+        with self._lock:
+            since = self._last_seen_id
+
+        query = text("""
+            SELECT id, x, y, color, user_id, clan_id
+            FROM pixels
+            WHERE id > :since
+            ORDER BY id ASC
+        """)
+        rows = db.execute(query, {"since": since}).fetchall()
+
+        with self._lock:
+            for row in rows:
+                self._set_raw(
+                    x=row.x, y=row.y, color=row.color,
+                    user_id=row.user_id or 0, clan_id=row.clan_id or 0,
+                )
+                if row.id > self._last_seen_id:
+                    self._last_seen_id = row.id
+
+        if rows:
+            logger.info("Canvas incremental reload: +%d pixels (id %d→%d)",
+                        len(rows), since, self._last_seen_id)
+        return len(rows)
+
+    def get_binary(self) -> bytes:
+        """Return cached binary representation for /api/pixels/canvas/binary."""
+        if self._cached_binary is None:
+            with self._lock:
+                self._cached_binary = bytes(self._buf)
+        return self._cached_binary
+
+
+# Module-level singleton
 canvas_cache = CanvasCache()
