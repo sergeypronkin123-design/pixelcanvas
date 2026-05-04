@@ -1,55 +1,57 @@
 """
 Battle phase logic — DB-backed instead of env-only.
 
-Architecture:
-- battles table is source of truth — admin creates battles via UI
-- env vars (BATTLE_*_START/END) act as fallback defaults if no row exists
-- Multiple battles can run simultaneously (e.g. weekly tournament + monthly)
+This module assumes the `Battle` model is defined elsewhere in your project
+(likely in app/models.py or app/models/battle.py). We import it lazily so
+this module can stay agnostic of where it lives.
+
+If your project doesn't have a `Battle` model yet, the env-based fallback
+still works for get_battle_phase().
 """
 import os
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Optional, Any
 
-from sqlalchemy import Column, Boolean, DateTime, Enum, Integer, String, func
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
-from app.core.database import Base
 
 settings = get_settings()
 
 
 # ---------------------------------------------------------------------------
-# Schema
+# Lazy Battle import — works whether your model is in app.models or elsewhere
 # ---------------------------------------------------------------------------
 
+_Battle = None
 
-class Battle(Base):
-    """A scheduled or running battle. Created by admin or auto-scheduler."""
 
-    __tablename__ = "battles"
+def _get_battle_model():
+    """Lazy lookup so this module doesn't crash if Battle isn't defined yet."""
+    global _Battle
+    if _Battle is not None:
+        return _Battle
 
-    id = Column(Integer, primary_key=True, index=True)
-    year = Column(Integer, nullable=False)
-    month = Column(Integer, nullable=False)
-    type = Column(Enum("solo", "clan", "tournament", name="battle_type_enum"), nullable=False)
-    status = Column(
-        Enum("scheduled", "active", "finished", "cancelled", name="battle_status_enum"),
-        default="scheduled",
-        nullable=False,
-    )
+    # Try common locations
+    try:
+        from app.models import Battle as B
+        _Battle = B
+        return _Battle
+    except ImportError:
+        pass
 
-    start_at = Column(DateTime(timezone=True), nullable=False)
-    end_at = Column(DateTime(timezone=True), nullable=False)
-    prize_pool = Column(Integer, default=0)  # in kopecks
-    title = Column(String(120), default="")
+    try:
+        from app.models.battle import Battle as B
+        _Battle = B
+        return _Battle
+    except ImportError:
+        pass
 
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    finished_at = Column(DateTime(timezone=True), nullable=True)
+    return None
 
 
 # ---------------------------------------------------------------------------
-# No-cooldown user list — env-driven (fast path), DB override possible
+# No-cooldown user list — env-driven (fast path)
 # ---------------------------------------------------------------------------
 
 _raw_users = os.getenv("NO_COOLDOWN_USERS", "")
@@ -67,12 +69,16 @@ def get_cooldown_seconds(is_subscriber: bool, user_id: Optional[int] = None) -> 
 
 
 # ---------------------------------------------------------------------------
-# Phase logic
+# Phase logic — works WITH or WITHOUT a Battle model
 # ---------------------------------------------------------------------------
 
 
-def get_active_battle(db: Session, type_: Optional[str] = None) -> Optional[Battle]:
+def get_active_battle(db: Session, type_: Optional[str] = None) -> Optional[Any]:
     """Find the currently-running battle, optionally filtered by type."""
+    Battle = _get_battle_model()
+    if Battle is None:
+        return None
+
     now = datetime.now(timezone.utc)
     q = db.query(Battle).filter(
         Battle.status == "active",
@@ -113,7 +119,7 @@ def is_clan_battle(db: Optional[Session] = None) -> bool:
 
 
 def get_battle_end_time(db: Optional[Session] = None) -> datetime:
-    """When does the current battle end? Falls back to env-derived."""
+    """When does the current battle end?"""
     if db is not None:
         battle = get_active_battle(db)
         if battle:
