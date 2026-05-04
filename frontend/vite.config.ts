@@ -16,32 +16,10 @@ export default defineConfig({
     minify: 'esbuild',
     cssMinify: true,
     sourcemap: true,
-    chunkSizeWarningLimit: 800,
-    rollupOptions: {
-      output: {
-        // Manual chunk splitting for better caching
-        manualChunks: (id) => {
-          if (id.includes('node_modules')) {
-            if (id.includes('react') || id.includes('react-dom') || id.includes('react-router')) {
-              return 'react-vendor';
-            }
-            if (id.includes('framer-motion')) {
-              return 'animation';
-            }
-            if (id.includes('@tanstack/react-query')) {
-              return 'data';
-            }
-            if (id.includes('lucide-react')) {
-              return 'icons';
-            }
-            if (id.includes('recharts') || id.includes('d3')) {
-              return 'charts';
-            }
-            return 'vendor';
-          }
-        },
-      },
-    },
+    chunkSizeWarningLimit: 1000,
+    // No manual chunks — Vite's automatic splitting is safe.
+    // Manual chunks caused circular vendor → react-vendor → vendor dependency
+    // that broke use-sync-external-store at runtime.
   },
 
   server: {
